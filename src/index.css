@@ -2,66 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 100%;
+    --background: 240 15% 6%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 100%;
-    --card-hover: 0 0% 14%;
+    --card: 240 15% 10%;
+    --card-foreground: 0 0% 98%;
+    --card-hover: 240 15% 14%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 240 15% 12%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 141 73% 42%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 280 85% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 280 100% 70%;
 
-    --secondary: 0 0% 14%;
+    --secondary: 200 70% 50%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 240 10% 18%;
+    --muted-foreground: 240 5% 55%;
 
-    --accent: 141 73% 42%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 320 80% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 141 73% 42%;
+    --border: 240 10% 20%;
+    --input: 240 10% 18%;
+    --ring: 280 85% 65%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
-    --sidebar-background: 0 0% 0%;
-    --sidebar-foreground: 0 0% 70%;
-    --sidebar-primary: 141 73% 42%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 14%;
-    --sidebar-ring: 141 73% 42%;
+    --sidebar-background: 240 15% 4%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 280 85% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 15% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 10% 15%;
+    --sidebar-ring: 280 85% 65%;
 
     /* Custom tokens */
-    --spotify-green: 141 73% 42%;
-    --spotify-green-hover: 141 73% 50%;
-    --surface-elevated: 0 0% 14%;
-    --surface-highlight: 0 0% 20%;
-    --text-subdued: 0 0% 65%;
-    --text-bright: 0 0% 100%;
+    --surface-glass: 240 15% 12%;
+    --surface-elevated: 240 15% 16%;
+    --surface-highlight: 240 15% 22%;
     
-    /* Gradients */
-    --gradient-featured: linear-gradient(180deg, hsl(280 60% 25%) 0%, hsl(var(--background)) 100%);
-    --gradient-card-hover: linear-gradient(180deg, hsl(0 0% 20% / 0.8) 0%, transparent 100%);
+    /* Gradient tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(280 85% 65%) 0%, hsl(320 80% 60%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(200 70% 50%) 0%, hsl(280 85% 65%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(280 40% 20% / 0.8) 0%, hsl(240 15% 6%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(240 15% 14% / 0.9) 0%, hsl(240 15% 8% / 0.9) 100%);
+    
+    /* Shadows */
+    --shadow-glow: 0 0 60px hsl(280 85% 65% / 0.3);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.4);
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 100%;
+    --background: 240 15% 6%;
+    --foreground: 0 0% 98%;
   }
 }
 
@@ -72,12 +76,16 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Figtree', sans-serif;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 12px;
+    width: 8px;
   }
 
   ::-webkit-scrollbar-track {
@@ -86,47 +94,91 @@
 
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--muted));
-    border-radius: 6px;
-    border: 3px solid transparent;
-    background-clip: content-box;
+    border-radius: 8px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground));
-    background-clip: content-box;
   }
 }
 
 @layer utilities {
-  .text-subdued {
-    color: hsl(var(--text-subdued));
+  .glass {
+    background: hsl(var(--surface-glass) / 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
-  .text-bright {
-    color: hsl(var(--text-bright));
+  .glass-strong {
+    background: hsl(var(--surface-glass) / 0.8);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
   }
 
-  .bg-surface-elevated {
-    background-color: hsl(var(--surface-elevated));
+  .gradient-primary {
+    background: var(--gradient-primary);
   }
 
-  .bg-surface-highlight {
-    background-color: hsl(var(--surface-highlight));
+  .gradient-secondary {
+    background: var(--gradient-secondary);
   }
 
-  .gradient-featured {
-    background: var(--gradient-featured);
+  .gradient-hero {
+    background: var(--gradient-hero);
   }
 
-  .hover-card-scale {
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-glow {
+    border: 1px solid hsl(var(--primary) / 0.3);
+    box-shadow: inset 0 0 20px hsl(var(--primary) / 0.05);
+  }
+
+  .hover-lift {
     @apply transition-all duration-300 ease-out;
   }
 
-  .hover-card-scale:hover {
-    @apply scale-[1.02] bg-card-hover;
+  .hover-lift:hover {
+    @apply -translate-y-1;
+    box-shadow: 0 12px 40px hsl(0 0% 0% / 0.5);
   }
 
-  .play-button-shadow {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px hsl(280 85% 65% / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(280 85% 65% / 0.6);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
   }
 }
