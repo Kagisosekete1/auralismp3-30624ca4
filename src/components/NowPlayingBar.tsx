@@ -11,26 +11,43 @@ import {
   Heart,
   ListMusic,
   Mic2,
+  Music2,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Track } from "@/hooks/useAppState";
 
 interface NowPlayingBarProps {
-  currentTrack: {
-    title: string;
-    artist: string;
-    albumArt: string;
-  };
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  isLiked: boolean;
+  onToggleLike: () => void;
 }
 
-const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [progress, setProgress] = useState(35);
+const NowPlayingBar = ({ 
+  currentTrack, 
+  isPlaying, 
+  onTogglePlay,
+  isLiked,
+  onToggleLike 
+}: NowPlayingBarProps) => {
+  const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
-  const [isLiked, setIsLiked] = useState(false);
+
+  if (!currentTrack) {
+    return (
+      <footer className="fixed bottom-0 left-0 right-0 h-24 glass-strong border-t border-border/30 px-6 flex items-center justify-center z-50">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <Music2 className="w-5 h-5" />
+          <span>Select a track to start playing</span>
+        </div>
+      </footer>
+    );
+  }
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 h-24 glass-strong border-t border-border/30 px-6 flex items-center justify-between z-50">
@@ -41,11 +58,9 @@ const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
           animate={{ rotate: isPlaying ? 360 : 0 }}
           transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
         >
-          <img
-            src={currentTrack.albumArt}
-            alt={currentTrack.title}
-            className="w-16 h-16 rounded-xl object-cover shadow-lg"
-          />
+          <div className="w-16 h-16 rounded-xl bg-surface-elevated flex items-center justify-center shadow-lg">
+            <Music2 className="w-8 h-8 text-muted-foreground" />
+          </div>
           <motion.div 
             className="absolute inset-0 rounded-xl border-2 border-primary/50"
             animate={{ opacity: isPlaying ? [0.5, 1, 0.5] : 0 }}
@@ -69,7 +84,7 @@ const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
         </div>
         
         <motion.button
-          onClick={() => setIsLiked(!isLiked)}
+          onClick={onToggleLike}
           className="flex-shrink-0"
           whileTap={{ scale: 0.9 }}
         >
@@ -98,7 +113,7 @@ const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
           </motion.button>
           
           <motion.button
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={onTogglePlay}
             className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center glow-primary"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -149,7 +164,7 @@ const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
 
         {/* Progress Bar */}
         <div className="flex items-center gap-3 w-full">
-          <span className="text-xs text-muted-foreground w-10 text-right font-medium">1:24</span>
+          <span className="text-xs text-muted-foreground w-10 text-right font-medium">0:00</span>
           <div className="flex-1 group relative h-6 flex items-center">
             <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <motion.div
@@ -170,7 +185,7 @@ const NowPlayingBar = ({ currentTrack }: NowPlayingBarProps) => {
               style={{ left: `calc(${progress}% - 8px)` }}
             />
           </div>
-          <span className="text-xs text-muted-foreground w-10 font-medium">4:02</span>
+          <span className="text-xs text-muted-foreground w-10 font-medium">{currentTrack.duration}</span>
         </div>
       </div>
 
