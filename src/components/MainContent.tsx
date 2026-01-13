@@ -1,17 +1,16 @@
 import { motion } from "framer-motion";
-import { TrendingUp, Clock, Sparkles } from "lucide-react";
-import PlaylistCard from "./PlaylistCard";
-import QuickPlayCard from "./QuickPlayCard";
-import TrackRow from "./TrackRow";
+import { Music2, Disc3, Radio, Mic2, Sparkles, Plus } from "lucide-react";
+import EmptyState from "./EmptyState";
+import type { Playlist } from "@/hooks/useAppState";
 
-import album1 from "@/assets/album-1.jpg";
-import album2 from "@/assets/album-2.jpg";
-import album3 from "@/assets/album-3.jpg";
-import album4 from "@/assets/album-4.jpg";
-import album5 from "@/assets/album-5.jpg";
-import album6 from "@/assets/album-6.jpg";
+interface MainContentProps {
+  activeSection: string;
+  playlists: Playlist[];
+  onCreatePlaylist: () => void;
+  onSelectPlaylist: (id: string) => void;
+}
 
-const MainContent = () => {
+const MainContent = ({ activeSection, playlists, onCreatePlaylist, onSelectPlaylist }: MainContentProps) => {
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -19,37 +18,39 @@ const MainContent = () => {
     return "Good evening";
   };
 
-  const quickPlayItems = [
-    { title: "Liked Songs", image: album1 },
-    { title: "Daily Mix 1", image: album2 },
-    { title: "Chill Hits", image: album3 },
-    { title: "Discover Weekly", image: album4 },
-    { title: "Release Radar", image: album5 },
-    { title: "Indie Vibes", image: album6 },
-  ];
-
-  const featuredPlaylists = [
-    { title: "Cosmic Dreams", description: "Ambient electronic for deep focus", image: album1 },
-    { title: "Neon Nights", description: "Synthwave and retro beats", image: album2 },
-    { title: "Acoustic Sessions", description: "Stripped back and raw performances", image: album3 },
-    { title: "Future Bass", description: "Heavy drops and euphoric melodies", image: album4 },
-    { title: "Jazz Lounge", description: "Smooth jazz for relaxation", image: album5 },
-    { title: "Indie Discovery", description: "Fresh indie tracks handpicked", image: album6 },
-  ];
-
-  const trendingTracks = [
-    { title: "Midnight City", artist: "M83", album: "Hurry Up, We're Dreaming", duration: "4:03", image: album1 },
-    { title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", duration: "3:20", image: album2 },
-    { title: "Electric Feel", artist: "MGMT", album: "Oracular Spectacular", duration: "3:49", image: album3 },
-    { title: "Starboy", artist: "The Weeknd", album: "Starboy", duration: "3:50", image: album4 },
-    { title: "Take On Me", artist: "a-ha", album: "Hunting High and Low", duration: "3:46", image: album5 },
+  const features = [
+    { 
+      icon: Plus, 
+      title: "Create Playlists", 
+      description: "Organize your music into custom collections",
+      action: onCreatePlaylist,
+      gradient: "from-primary to-accent"
+    },
+    { 
+      icon: Disc3, 
+      title: "Explore", 
+      description: "Discover new music and artists",
+      gradient: "from-secondary to-primary"
+    },
+    { 
+      icon: Radio, 
+      title: "Radio", 
+      description: "Listen to curated stations",
+      gradient: "from-accent to-secondary"
+    },
+    { 
+      icon: Mic2, 
+      title: "Artists", 
+      description: "Follow your favorite artists",
+      gradient: "from-primary to-secondary"
+    },
   ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: { staggerChildren: 0.05 }
+      transition: { staggerChildren: 0.1 }
     }
   };
 
@@ -59,7 +60,7 @@ const MainContent = () => {
   };
 
   return (
-    <main className="flex-1 overflow-y-auto">
+    <main className="flex-1 overflow-y-auto pb-32">
       {/* Hero Section */}
       <div className="relative gradient-hero pt-8 pb-12 px-8">
         <motion.div
@@ -71,29 +72,39 @@ const MainContent = () => {
             {getGreeting()}
           </h1>
           <p className="text-muted-foreground text-lg">
-            Ready to discover something new?
+            Welcome to Auralis. Start building your music library.
           </p>
         </motion.div>
 
-        {/* Quick Play Grid */}
+        {/* Quick Actions */}
         <motion.div 
-          className="grid grid-cols-2 lg:grid-cols-3 gap-4 mt-8"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {quickPlayItems.map((item, index) => (
-            <motion.div key={index} variants={itemVariants}>
-              <QuickPlayCard
-                title={item.title}
-                imageUrl={item.image}
-              />
-            </motion.div>
+          {features.map((feature, index) => (
+            <motion.button
+              key={index}
+              onClick={feature.action}
+              className="group glass rounded-2xl p-6 text-left border border-border/30 hover:border-primary/30 transition-all"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                <feature.icon className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <h3 className="font-display font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                {feature.title}
+              </h3>
+              <p className="text-sm text-muted-foreground">{feature.description}</p>
+            </motion.button>
           ))}
         </motion.div>
       </div>
 
-      {/* Featured Section */}
+      {/* Your Playlists Section */}
       <section className="px-8 py-8">
         <motion.div 
           className="flex items-center gap-3 mb-6"
@@ -103,89 +114,74 @@ const MainContent = () => {
           <div className="w-10 h-10 rounded-xl gradient-secondary flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-secondary-foreground" />
           </div>
-          <div>
-            <h2 className="text-2xl font-display font-bold text-foreground">Made For You</h2>
-            <p className="text-sm text-muted-foreground">Personalized mixes based on your taste</p>
+          <div className="flex-1">
+            <h2 className="text-2xl font-display font-bold text-foreground">Your Playlists</h2>
+            <p className="text-sm text-muted-foreground">Your personal music collections</p>
           </div>
           <motion.button
-            className="ml-auto text-sm font-semibold text-primary hover:underline"
-            whileHover={{ x: 4 }}
+            onClick={onCreatePlaylist}
+            className="px-4 py-2 rounded-xl glass border-glow text-foreground font-medium flex items-center gap-2"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            See all
+            <Plus className="w-4 h-4" />
+            New Playlist
           </motion.button>
         </motion.div>
 
-        <motion.div 
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {featuredPlaylists.map((item, index) => (
-            <motion.div key={index} variants={itemVariants}>
-              <PlaylistCard
-                title={item.title}
-                description={item.description}
-                imageUrl={item.image}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
-
-      {/* Trending Tracks */}
-      <section className="px-8 py-8 pb-32">
-        <motion.div 
-          className="flex items-center gap-3 mb-6"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-display font-bold text-foreground">Trending Now</h2>
-            <p className="text-sm text-muted-foreground">What everyone's listening to</p>
-          </div>
-          <motion.button
-            className="ml-auto text-sm font-semibold text-primary hover:underline"
-            whileHover={{ x: 4 }}
+        {playlists.length === 0 ? (
+          <EmptyState
+            icon={Music2}
+            title="No playlists yet"
+            description="Create your first playlist to start organizing your music"
+            actionLabel="Create Playlist"
+            onAction={onCreatePlaylist}
+          />
+        ) : (
+          <motion.div 
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
           >
-            See all
-          </motion.button>
-        </motion.div>
+            {playlists.map((playlist, index) => (
+              <motion.button
+                key={playlist.id}
+                onClick={() => onSelectPlaylist(playlist.id)}
+                className="group glass rounded-2xl p-4 text-left border border-border/30 hover:border-primary/30 transition-all"
+                variants={itemVariants}
+                whileHover={{ y: -8 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className={`w-full aspect-square rounded-xl bg-gradient-to-br ${playlist.gradient} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}>
+                  <Music2 className="w-12 h-12 text-primary-foreground/80" />
+                </div>
+                <h3 className="font-display font-bold text-foreground mb-1 truncate group-hover:text-primary transition-colors">
+                  {playlist.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {playlist.tracks.length} songs
+                </p>
+              </motion.button>
+            ))}
 
-        {/* Track Headers */}
-        <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 items-center px-4 py-2 text-sm text-muted-foreground border-b border-border/30 mb-2">
-          <span className="w-10 text-center">#</span>
-          <span>Title</span>
-          <span>Album</span>
-          <div className="flex items-center gap-3">
-            <span className="w-4" />
-            <Clock className="w-4 h-4" />
-            <span className="w-4" />
-          </div>
-        </div>
-
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {trendingTracks.map((track, index) => (
-            <motion.div key={index} variants={itemVariants}>
-              <TrackRow
-                index={index + 1}
-                title={track.title}
-                artist={track.artist}
-                album={track.album}
-                duration={track.duration}
-                imageUrl={track.image}
-                isCurrentlyPlaying={index === 0}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
+            {/* Add New Playlist Card */}
+            <motion.button
+              onClick={onCreatePlaylist}
+              className="group glass rounded-2xl p-4 text-left border border-dashed border-border/50 hover:border-primary/50 transition-all flex flex-col items-center justify-center aspect-square"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="w-16 h-16 rounded-xl bg-surface-elevated/50 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                <Plus className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <p className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                Create Playlist
+              </p>
+            </motion.button>
+          </motion.div>
+        )}
       </section>
     </main>
   );
