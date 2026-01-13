@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import MainContent from "@/components/MainContent";
 import NowPlayingBar from "@/components/NowPlayingBar";
@@ -10,13 +11,18 @@ const Index = () => {
   const [activeSection, setActiveSection] = useState("home");
 
   const currentTrack = {
-    title: "Blinding Lights",
-    artist: "The Weeknd",
+    title: "Midnight City",
+    artist: "M83",
     albumArt: album1,
   };
 
   return (
-    <div className="h-screen flex flex-col bg-sidebar overflow-hidden">
+    <motion.div 
+      className="h-screen flex flex-col bg-background overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       {/* Main App */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -26,7 +32,7 @@ const Index = () => {
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden rounded-lg m-2 ml-0 bg-background">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar />
           <MainContent />
         </div>
@@ -34,7 +40,7 @@ const Index = () => {
 
       {/* Now Playing Bar */}
       <NowPlayingBar currentTrack={currentTrack} />
-    </div>
+    </motion.div>
   );
 };
 
