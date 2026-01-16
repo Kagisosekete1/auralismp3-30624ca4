@@ -15,14 +15,29 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Track } from "@/hooks/useAppState";
+
+interface NowPlayingTrack {
+  id: string;
+  title: string;
+  artist: string;
+  coverUrl?: string;
+  duration?: number;
+}
 
 interface NowPlayingBarProps {
-  currentTrack: Track | null;
+  currentTrack: NowPlayingTrack | null;
   isPlaying: boolean;
   onTogglePlay: () => void;
   isLiked: boolean;
   onToggleLike: () => void;
+  progress?: number;
+  duration?: number;
+  onSeek?: (percent: number) => void;
+  volume?: number;
+  onVolumeChange?: (volume: number) => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  formatTime?: (seconds: number) => string;
 }
 
 const NowPlayingBar = ({ 
@@ -30,37 +45,73 @@ const NowPlayingBar = ({
   isPlaying, 
   onTogglePlay,
   isLiked,
-  onToggleLike 
+  onToggleLike,
+  progress = 0,
+  duration = 0,
+  onSeek,
+  volume = 70,
+  onVolumeChange,
+  isMuted = false,
+  onToggleMute,
+  formatTime,
 }: NowPlayingBarProps) => {
-  const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(70);
-  const [isMuted, setIsMuted] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
+  const [localVolume, setLocalVolume] = useState(volume);
+  const [localMuted, setLocalMuted] = useState(isMuted);
+
+  const handleVolumeChange = (val: number) => {
+    setLocalVolume(val);
+    setLocalMuted(false);
+    onVolumeChange?.(val);
+  };
+
+  const handleMuteToggle = () => {
+    setLocalMuted(!localMuted);
+    onToggleMute?.();
+  };
+
+  const currentTime = duration ? (progress / 100) * duration : 0;
+
+  const defaultFormatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const timeFormatter = formatTime || defaultFormatTime;
 
   if (!currentTrack) {
     return (
-      <footer className="fixed bottom-0 left-0 right-0 h-24 glass-strong border-t border-border/30 px-6 flex items-center justify-center z-50">
+      <footer className="fixed bottom-16 md:bottom-0 left-0 right-0 h-20 md:h-24 glass-strong border-t border-border/30 px-4 md:px-6 flex items-center justify-center z-40">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Music2 className="w-5 h-5" />
-          <span>Select a track to start playing</span>
+          <span className="text-sm">Select a track to start playing</span>
         </div>
       </footer>
     );
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 h-24 glass-strong border-t border-border/30 px-6 flex items-center justify-between z-50">
+    <footer className="fixed bottom-16 md:bottom-0 left-0 right-0 h-20 md:h-24 glass-strong border-t border-border/30 px-4 md:px-6 flex items-center justify-between z-40">
       {/* Left - Current Track */}
-      <div className="flex items-center gap-4 w-[30%] min-w-[200px]">
+      <div className="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] min-w-0">
         <motion.div
-          className="relative"
+          className="relative flex-shrink-0"
           animate={{ rotate: isPlaying ? 360 : 0 }}
           transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
         >
-          <div className="w-16 h-16 rounded-xl bg-surface-elevated flex items-center justify-center shadow-lg">
-            <Music2 className="w-8 h-8 text-muted-foreground" />
-          </div>
+          {currentTrack.coverUrl ? (
+            <img 
+              src={currentTrack.coverUrl} 
+              alt={currentTrack.title}
+              className="w-12 h-12 md:w-16 md:h-16 rounded-xl object-cover shadow-lg"
+            />
+          ) : (
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-elevated flex items-center justify-center shadow-lg">
+              <Music2 className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
+            </div>
+          )}
           <motion.div 
             className="absolute inset-0 rounded-xl border-2 border-primary/50"
             animate={{ opacity: isPlaying ? [0.5, 1, 0.5] : 0 }}
@@ -68,15 +119,15 @@ const NowPlayingBar = ({
           />
         </motion.div>
         
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <motion.p 
-            className="font-semibold text-foreground truncate hover:text-primary cursor-pointer transition-colors"
+            className="font-semibold text-foreground truncate hover:text-primary cursor-pointer transition-colors text-sm md:text-base"
             whileHover={{ x: 2 }}
           >
             {currentTrack.title}
           </motion.p>
           <motion.p 
-            className="text-sm text-muted-foreground truncate hover:text-foreground cursor-pointer transition-colors"
+            className="text-xs md:text-sm text-muted-foreground truncate hover:text-foreground cursor-pointer transition-colors"
             whileHover={{ x: 2 }}
           >
             {currentTrack.artist}
@@ -85,7 +136,7 @@ const NowPlayingBar = ({
         
         <motion.button
           onClick={onToggleLike}
-          className="flex-shrink-0"
+          className="flex-shrink-0 hidden sm:block"
           whileTap={{ scale: 0.9 }}
         >
           <Heart className={`w-5 h-5 transition-colors ${isLiked ? "fill-accent text-accent" : "text-muted-foreground hover:text-foreground"}`} />
@@ -93,11 +144,11 @@ const NowPlayingBar = ({
       </div>
 
       {/* Center - Player Controls */}
-      <div className="flex flex-col items-center max-w-[40%] w-full">
-        <div className="flex items-center gap-5 mb-3">
+      <div className="flex flex-col items-center max-w-[30%] md:max-w-[40%] w-full">
+        <div className="flex items-center gap-3 md:gap-5 mb-2 md:mb-3">
           <motion.button
             onClick={() => setIsShuffle(!isShuffle)}
-            className={`transition-colors ${isShuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`hidden md:block transition-colors ${isShuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -109,12 +160,12 @@ const NowPlayingBar = ({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <SkipBack className="w-5 h-5 fill-current" />
+            <SkipBack className="w-4 h-4 md:w-5 md:h-5 fill-current" />
           </motion.button>
           
           <motion.button
             onClick={onTogglePlay}
-            className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center glow-primary"
+            className="w-10 h-10 md:w-12 md:h-12 rounded-full gradient-primary flex items-center justify-center glow-primary"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -126,7 +177,7 @@ const NowPlayingBar = ({
                   animate={{ scale: 1, rotate: 0 }}
                   exit={{ scale: 0, rotate: 90 }}
                 >
-                  <Pause className="w-5 h-5 text-primary-foreground fill-primary-foreground" />
+                  <Pause className="w-4 h-4 md:w-5 md:h-5 text-primary-foreground fill-primary-foreground" />
                 </motion.div>
               ) : (
                 <motion.div
@@ -135,7 +186,7 @@ const NowPlayingBar = ({
                   animate={{ scale: 1, rotate: 0 }}
                   exit={{ scale: 0, rotate: -90 }}
                 >
-                  <Play className="w-5 h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+                  <Play className="w-4 h-4 md:w-5 md:h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -146,12 +197,12 @@ const NowPlayingBar = ({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <SkipForward className="w-5 h-5 fill-current" />
+            <SkipForward className="w-4 h-4 md:w-5 md:h-5 fill-current" />
           </motion.button>
           
           <motion.button
             onClick={() => setRepeatMode(repeatMode === "off" ? "all" : repeatMode === "all" ? "one" : "off")}
-            className={`relative transition-colors ${repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            className={`hidden md:block relative transition-colors ${repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -163,8 +214,10 @@ const NowPlayingBar = ({
         </div>
 
         {/* Progress Bar */}
-        <div className="flex items-center gap-3 w-full">
-          <span className="text-xs text-muted-foreground w-10 text-right font-medium">0:00</span>
+        <div className="hidden md:flex items-center gap-3 w-full">
+          <span className="text-xs text-muted-foreground w-10 text-right font-medium">
+            {timeFormatter(currentTime)}
+          </span>
           <div className="flex-1 group relative h-6 flex items-center">
             <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <motion.div
@@ -177,7 +230,7 @@ const NowPlayingBar = ({
               min="0"
               max="100"
               value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
+              onChange={(e) => onSeek?.(Number(e.target.value))}
               className="absolute inset-0 w-full opacity-0 cursor-pointer"
             />
             <motion.div
@@ -185,14 +238,24 @@ const NowPlayingBar = ({
               style={{ left: `calc(${progress}% - 8px)` }}
             />
           </div>
-          <span className="text-xs text-muted-foreground w-10 font-medium">{currentTrack.duration}</span>
+          <span className="text-xs text-muted-foreground w-10 font-medium">
+            {timeFormatter(duration)}
+          </span>
         </div>
       </div>
 
       {/* Right - Volume & Other Controls */}
-      <div className="flex items-center justify-end gap-4 w-[30%] min-w-[200px]">
+      <div className="flex items-center justify-end gap-2 md:gap-4 w-[35%] md:w-[30%]">
         <motion.button 
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          onClick={onToggleLike}
+          className="sm:hidden"
+          whileTap={{ scale: 0.9 }}
+        >
+          <Heart className={`w-5 h-5 transition-colors ${isLiked ? "fill-accent text-accent" : "text-muted-foreground hover:text-foreground"}`} />
+        </motion.button>
+
+        <motion.button 
+          className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -200,21 +263,21 @@ const NowPlayingBar = ({
         </motion.button>
         
         <motion.button 
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
           <ListMusic className="w-4 h-4" />
         </motion.button>
 
-        <div className="flex items-center gap-2 group">
+        <div className="hidden md:flex items-center gap-2 group">
           <motion.button 
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={handleMuteToggle}
             className="text-muted-foreground hover:text-foreground transition-colors"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            {isMuted || volume === 0 ? (
+            {localMuted || localVolume === 0 ? (
               <VolumeX className="w-4 h-4" />
             ) : (
               <Volume2 className="w-4 h-4" />
@@ -224,25 +287,22 @@ const NowPlayingBar = ({
             <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-foreground group-hover:gradient-primary rounded-full"
-                style={{ width: `${isMuted ? 0 : volume}%` }}
+                style={{ width: `${localMuted ? 0 : localVolume}%` }}
               />
             </div>
             <input
               type="range"
               min="0"
               max="100"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => {
-                setVolume(Number(e.target.value));
-                setIsMuted(false);
-              }}
+              value={localMuted ? 0 : localVolume}
+              onChange={(e) => handleVolumeChange(Number(e.target.value))}
               className="absolute inset-0 w-full opacity-0 cursor-pointer"
             />
           </div>
         </div>
         
         <motion.button 
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
