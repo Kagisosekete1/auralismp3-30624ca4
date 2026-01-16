@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import NowPlayingBar from "@/components/NowPlayingBar";
 import TopBar from "@/components/TopBar";
+import MobileNav from "@/components/MobileNav";
 import CreatePlaylistModal from "@/components/CreatePlaylistModal";
 import AddTrackModal from "@/components/AddTrackModal";
 import UploadMusicModal from "@/components/UploadMusicModal";
@@ -17,9 +20,16 @@ import ProfilePage from "@/components/pages/ProfilePage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import NotificationsPage from "@/components/pages/NotificationsPage";
 import UpgradePage from "@/components/pages/UpgradePage";
-import { useAppState } from "@/hooks/useAppState";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDatabase } from "@/hooks/useDatabase";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { tracks, playlists, likedTrackIds, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
+
   const [activeSection, setActiveSection] = useState("home");
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddTrack, setShowAddTrack] = useState(false);
@@ -27,22 +37,25 @@ const Index = () => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const {
-    playlists, currentTrack, isPlaying, likedSongs,
-    createPlaylist, deletePlaylist, addTrackToPlaylist,
-    removeTrackFromPlaylist, toggleLike, playTrack, togglePlay,
-  } = useAppState();
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
-  const handleCreatePlaylist = (name: string, description: string) => {
-    const newPlaylist = createPlaylist(name, description);
-    toast.success(`Playlist "${name}" created!`);
-    setActiveSection(`playlist-${newPlaylist.id}`);
-    setSelectedPlaylistId(newPlaylist.id);
+  const handleCreatePlaylist = async (name: string, description: string) => {
+    const newPlaylist = await createPlaylist(name, description);
+    if (newPlaylist) {
+      toast.success(`Playlist "${name}" created!`);
+      setActiveSection(`playlist-${newPlaylist.id}`);
+      setSelectedPlaylistId(newPlaylist.id);
+    }
   };
 
-  const handleDeletePlaylist = (id: string) => {
+  const handleDeletePlaylist = async (id: string) => {
     const playlist = playlists.find((p) => p.id === id);
-    deletePlaylist(id);
+    await deletePlaylist(id);
     toast.success(`Playlist "${playlist?.name}" deleted`);
     if (activeSection === `playlist-${id}`) {
       setActiveSection("home");
@@ -64,53 +77,56 @@ const Index = () => {
     setSelectedPlaylistId(id);
   };
 
-  const handleAddTrackToPlaylist = (track: any) => {
-    if (selectedPlaylistId && track) {
-      addTrackToPlaylist(selectedPlaylistId, track);
-      toast.success("Track added to playlist!");
-    }
+  const handlePlayTrack = (track: any) => {
+    playTrack({
+      id: track.id,
+      title: track.title || track.name,
+      artist: track.artist_name || track.artist,
+      audioUrl: track.audio_url || track.audioUrl,
+      coverUrl: track.cover_url || track.coverUrl,
+      duration: track.duration,
+    });
   };
-
-  const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId);
-  const isCurrentTrackLiked = currentTrack ? likedSongs.includes(currentTrack.id) : false;
 
   const handleToggleLikeCurrentTrack = () => {
     if (currentTrack) {
       toggleLike(currentTrack.id);
-      toast.success(isCurrentTrackLiked ? "Removed from Liked Songs" : "Added to Liked Songs");
+      toast.success(likedTrackIds.includes(currentTrack.id) ? "Removed from Liked Songs" : "Added to Liked Songs");
     }
   };
 
-  const renderContent = () => {
-    if (selectedPlaylist) {
-      return (
-        <PlaylistView
-          playlist={selectedPlaylist}
-          onAddTrack={() => setShowAddTrack(true)}
-          onRemoveTrack={(trackId) => {
-            removeTrackFromPlaylist(selectedPlaylist.id, trackId);
-            toast.success("Track removed");
-          }}
-          onPlayTrack={playTrack}
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-        />
-      );
-    }
+  // Convert playlists for sidebar
+  const sidebarPlaylists = playlists.map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || "",
+    tracks: [],
+    gradient: p.gradient,
+    createdAt: new Date(p.created_at),
+  }));
 
+  if (authLoading || dbLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const renderContent = () => {
     switch (activeSection) {
       case "home":
-        return <HomePage playlists={playlists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "explore":
-        return <ExplorePage />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "genre":
         return <GenrePage />;
       case "artists":
         return <ArtistsPage />;
       case "library":
-        return <LibraryPage playlists={playlists} likedCount={likedSongs.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} />;
+        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "profile":
-        return <ProfilePage likedCount={likedSongs.length} playlistCount={playlists.length} />;
+        return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} />;
       case "settings":
         return <SettingsPage />;
       case "notifications":
@@ -118,9 +134,17 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={playlists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />;
     }
   };
+
+  const nowPlayingTrack = currentTrack ? {
+    id: currentTrack.id,
+    title: currentTrack.title,
+    artist: currentTrack.artist,
+    coverUrl: currentTrack.coverUrl,
+    duration: currentTrack.duration,
+  } : null;
 
   return (
     <motion.div className="h-screen flex flex-col bg-background overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
@@ -130,10 +154,10 @@ const Index = () => {
           <Sidebar
             activeSection={activeSection}
             onSectionChange={handleSectionChange}
-            playlists={playlists}
+            playlists={sidebarPlaylists}
             onCreatePlaylist={() => setShowCreatePlaylist(true)}
             onDeletePlaylist={handleDeletePlaylist}
-            likedCount={likedSongs.length}
+            likedCount={likedTrackIds.length}
             onUploadMusic={() => setShowUploadMusic(true)}
           />
         </div>
@@ -143,22 +167,39 @@ const Index = () => {
             onSectionChange={handleSectionChange}
             onUploadMusic={() => setShowUploadMusic(true)}
           />
-          {renderContent()}
+          <div className="flex-1 overflow-y-auto pb-36 md:pb-24">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
       <NowPlayingBar
-        currentTrack={currentTrack}
+        currentTrack={nowPlayingTrack}
         isPlaying={isPlaying}
         onTogglePlay={togglePlay}
-        isLiked={isCurrentTrackLiked}
+        isLiked={currentTrack ? likedTrackIds.includes(currentTrack.id) : false}
         onToggleLike={handleToggleLikeCurrentTrack}
+        progress={progress}
+        duration={duration}
+        onSeek={seek}
+        volume={volume}
+        onVolumeChange={setVolume}
+        isMuted={isMuted}
+        onToggleMute={() => setIsMuted(!isMuted)}
+        formatTime={formatTime}
+      />
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav
+        activeSection={activeSection}
+        onSectionChange={handleSectionChange}
+        onUploadMusic={() => setShowUploadMusic(true)}
       />
 
       {/* Modals */}
       <CreatePlaylistModal isOpen={showCreatePlaylist} onClose={() => setShowCreatePlaylist(false)} onCreate={handleCreatePlaylist} />
-      <AddTrackModal isOpen={showAddTrack} onClose={() => setShowAddTrack(false)} onAdd={handleAddTrackToPlaylist} playlistName={selectedPlaylist?.name || ""} />
-      <UploadMusicModal isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} />
+      <AddTrackModal isOpen={showAddTrack} onClose={() => setShowAddTrack(false)} onAdd={() => {}} playlistName="" />
+      <UploadMusicModal isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} />
     </motion.div>
   );
 };

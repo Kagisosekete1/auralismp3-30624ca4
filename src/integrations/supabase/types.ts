@@ -14,7 +14,263 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      liked_tracks: {
+        Row: {
+          created_at: string
+          id: string
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liked_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_tracks: {
+        Row: {
+          added_at: string
+          id: string
+          playlist_id: string
+          position: number | null
+          track_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          playlist_id: string
+          position?: number | null
+          track_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          playlist_id?: string
+          position?: number | null
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_tracks_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          gradient: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          gradient?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          gradient?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          artist_name: string | null
+          avatar_url: string | null
+          bio: string | null
+          country: string | null
+          created_at: string
+          display_name: string | null
+          followers_count: number | null
+          id: string
+          instagram: string | null
+          is_artist: boolean | null
+          tiktok: string | null
+          total_plays: number | null
+          updated_at: string
+          user_id: string
+          website: string | null
+          youtube: string | null
+        }
+        Insert: {
+          artist_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          followers_count?: number | null
+          id?: string
+          instagram?: string | null
+          is_artist?: boolean | null
+          tiktok?: string | null
+          total_plays?: number | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+          youtube?: string | null
+        }
+        Update: {
+          artist_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          followers_count?: number | null
+          id?: string
+          instagram?: string | null
+          is_artist?: boolean | null
+          tiktok?: string | null
+          total_plays?: number | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+          youtube?: string | null
+        }
+        Relationships: []
+      }
+      tracks: {
+        Row: {
+          album: string | null
+          artist_name: string
+          audio_url: string
+          bpm: number | null
+          cover_url: string | null
+          created_at: string
+          duration: number | null
+          genre: string | null
+          id: string
+          is_approved: boolean | null
+          is_explicit: boolean | null
+          key: string | null
+          like_count: number | null
+          mood_tags: string[] | null
+          play_count: number | null
+          secondary_genre: string | null
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          version: string | null
+          video_reel_url: string | null
+        }
+        Insert: {
+          album?: string | null
+          artist_name: string
+          audio_url: string
+          bpm?: number | null
+          cover_url?: string | null
+          created_at?: string
+          duration?: number | null
+          genre?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_explicit?: boolean | null
+          key?: string | null
+          like_count?: number | null
+          mood_tags?: string[] | null
+          play_count?: number | null
+          secondary_genre?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          version?: string | null
+          video_reel_url?: string | null
+        }
+        Update: {
+          album?: string | null
+          artist_name?: string
+          audio_url?: string
+          bpm?: number | null
+          cover_url?: string | null
+          created_at?: string
+          duration?: number | null
+          genre?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_explicit?: boolean | null
+          key?: string | null
+          like_count?: number | null
+          mood_tags?: string[] | null
+          play_count?: number | null
+          secondary_genre?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+          video_reel_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

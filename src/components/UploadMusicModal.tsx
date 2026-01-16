@@ -1,26 +1,35 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, Music2, User, Mail, Phone, Globe, Instagram, Video, Check } from "lucide-react";
+import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image } from "lucide-react";
 import { toast } from "sonner";
+import { useDatabase } from "@/hooks/useDatabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UploadMusicModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const genres = ["Hip-Hop", "Pop", "Afrobeats", "EDM", "R&B", "Rock", "Drill", "Trap", "House", "Other"];
 
-const UploadMusicModal = ({ isOpen, onClose }: UploadMusicModalProps) => {
+const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps) => {
+  const { user } = useAuth();
+  const { uploadTrack, profile } = useDatabase();
   const [step, setStep] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
-    producerName: "", legalName: "", email: "", phone: "", country: "",
-    bio: "", primaryGenres: [] as string[], moodTags: "",
+    producerName: "", bio: "", primaryGenres: [] as string[], moodTags: "",
     instagram: "", tiktok: "", youtube: "", website: "",
-    trackTitle: "", version: "original", primaryGenre: "", secondaryGenre: "",
+    trackTitle: "", version: "original", primaryGenre: "", 
     bpm: "", key: "", explicit: false,
-    ownsRights: false, previouslyReleased: false, releasedWhere: "",
-    allowMonetization: true, distribution: "platform", royaltySplit: "",
-    termsAgreed: false, distributionAgreed: false, rightsConfirmed: false,
+    ownsRights: false, termsAgreed: false, distributionAgreed: false, rightsConfirmed: false,
     useVideoReel: false,
   });
 
@@ -37,28 +46,129 @@ const UploadMusicModal = ({ isOpen, onClose }: UploadMusicModalProps) => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ["audio/mpeg", "audio/wav", "audio/flac", "audio/aiff", "audio/x-aiff"];
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|flac|aiff)$/i)) {
+        toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
+        return;
+      }
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error("File size must be under 100MB");
+        return;
+      }
+      setAudioFile(file);
+      toast.success(`Audio file "${file.name}" selected`);
+    }
+  };
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please upload an image file");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Cover image must be under 10MB");
+        return;
+      }
+      setCoverFile(file);
+      toast.success(`Cover art "${file.name}" selected`);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!user) {
+      toast.error("Please sign in to upload music");
+      return;
+    }
+
     if (!formData.termsAgreed || !formData.distributionAgreed || !formData.rightsConfirmed) {
       toast.error("Please agree to all terms");
       return;
     }
-    toast.success("Track submitted successfully! We'll review it shortly.");
-    onClose();
+
+    if (!audioFile) {
+      toast.error("Please upload an audio file");
+      return;
+    }
+
+    if (!formData.trackTitle) {
+      toast.error("Please enter a track title");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const result = await uploadTrack(audioFile, coverFile, {
+        title: formData.trackTitle,
+        artistName: formData.producerName || profile?.display_name || "Unknown Artist",
+        genre: formData.primaryGenre,
+        bpm: formData.bpm ? parseInt(formData.bpm) : undefined,
+        key: formData.key || undefined,
+        isExplicit: formData.explicit,
+        version: formData.version,
+        moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
+      });
+
+      if (result) {
+        toast.success("Track uploaded successfully! 🎉");
+        onSuccess?.();
+        resetForm();
+        onClose();
+      }
+    } catch (error) {
+      toast.error("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const resetForm = () => {
     setStep(1);
+    setAudioFile(null);
+    setCoverFile(null);
     setFormData({
-      producerName: "", legalName: "", email: "", phone: "", country: "",
-      bio: "", primaryGenres: [], moodTags: "",
+      producerName: "", bio: "", primaryGenres: [], moodTags: "",
       instagram: "", tiktok: "", youtube: "", website: "",
-      trackTitle: "", version: "original", primaryGenre: "", secondaryGenre: "",
+      trackTitle: "", version: "original", primaryGenre: "",
       bpm: "", key: "", explicit: false,
-      ownsRights: false, previouslyReleased: false, releasedWhere: "",
-      allowMonetization: true, distribution: "platform", royaltySplit: "",
-      termsAgreed: false, distributionAgreed: false, rightsConfirmed: false,
+      ownsRights: false, termsAgreed: false, distributionAgreed: false, rightsConfirmed: false,
       useVideoReel: false,
     });
   };
 
   const inputClass = "w-full px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all text-sm";
+
+  if (!user) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+          >
+            <motion.div
+              className="w-full max-w-md glass rounded-2xl border border-border/50 p-8 text-center"
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <Music2 className="w-16 h-16 text-primary mx-auto mb-4" />
+              <h2 className="text-xl font-display font-bold text-foreground mb-2">Sign In Required</h2>
+              <p className="text-muted-foreground mb-6">Please sign in to upload your music</p>
+              <button onClick={onClose} className="px-6 py-3 rounded-xl gradient-primary text-primary-foreground font-medium">
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -101,23 +211,11 @@ const UploadMusicModal = ({ isOpen, onClose }: UploadMusicModalProps) => {
             <div className="p-6 space-y-6">
               {step === 1 && (
                 <>
-                  <h3 className="text-lg font-display font-bold text-foreground">Producer Information</h3>
+                  <h3 className="text-lg font-display font-bold text-foreground">Artist Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Producer/Artist Name *</label>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-foreground mb-2">Artist/Producer Name *</label>
                       <input className={inputClass} placeholder="Your stage name" value={formData.producerName} onChange={e => updateField("producerName", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Legal Name *</label>
-                      <input className={inputClass} placeholder="For contracts & payouts" value={formData.legalName} onChange={e => updateField("legalName", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Email *</label>
-                      <input type="email" className={inputClass} placeholder="your@email.com" value={formData.email} onChange={e => updateField("email", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Country *</label>
-                      <input className={inputClass} placeholder="Your country" value={formData.country} onChange={e => updateField("country", e.target.value)} />
                     </div>
                   </div>
                   <div>
@@ -186,16 +284,52 @@ const UploadMusicModal = ({ isOpen, onClose }: UploadMusicModalProps) => {
                 <>
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Files</h3>
                   <div className="space-y-4">
-                    <div className="border-2 border-dashed border-border/50 rounded-2xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                      <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="font-medium text-foreground mb-1">Upload Audio File</p>
-                      <p className="text-sm text-muted-foreground">WAV, AIFF, FLAC, MP3 • Min 16-bit/44.1kHz</p>
+                    {/* Audio File Upload */}
+                    <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,audio/*" onChange={handleAudioSelect} className="hidden" />
+                    <div 
+                      onClick={() => audioInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+                    >
+                      {audioFile ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <FileAudio className="w-12 h-12 text-primary" />
+                          <div className="text-left">
+                            <p className="font-medium text-foreground">{audioFile.name}</p>
+                            <p className="text-sm text-muted-foreground">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="font-medium text-foreground mb-1">Upload Audio File *</p>
+                          <p className="text-sm text-muted-foreground">WAV, AIFF, FLAC, MP3 • Max 100MB</p>
+                        </>
+                      )}
                     </div>
-                    <div className="border-2 border-dashed border-border/50 rounded-2xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                      <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="font-medium text-foreground mb-1">Upload Cover Art</p>
-                      <p className="text-sm text-muted-foreground">JPG or PNG • Min 3000×3000px</p>
+
+                    {/* Cover Art Upload */}
+                    <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
+                    <div 
+                      onClick={() => coverInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+                    >
+                      {coverFile ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <Image className="w-12 h-12 text-primary" />
+                          <div className="text-left">
+                            <p className="font-medium text-foreground">{coverFile.name}</p>
+                            <p className="text-sm text-muted-foreground">{(coverFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="font-medium text-foreground mb-1">Upload Cover Art (Optional)</p>
+                          <p className="text-sm text-muted-foreground">JPG or PNG • Min 3000×3000px recommended</p>
+                        </>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-3 p-4 glass rounded-xl border border-border/30">
                       <button onClick={() => updateField("useVideoReel", !formData.useVideoReel)}
                         className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${formData.useVideoReel ? 'bg-primary border-primary' : 'border-border'}`}>
@@ -252,16 +386,22 @@ const UploadMusicModal = ({ isOpen, onClose }: UploadMusicModalProps) => {
             {/* Footer */}
             <div className="sticky bottom-0 glass-strong p-6 border-t border-border/30 flex gap-3">
               {step > 1 && (
-                <motion.button onClick={() => setStep(step - 1)} className="px-6 py-3 rounded-xl glass border-glow text-foreground font-medium" whileTap={{ scale: 0.98 }}>
+                <motion.button onClick={() => setStep(step - 1)} className="px-6 py-3 rounded-xl glass border-glow text-foreground font-medium" whileTap={{ scale: 0.98 }} disabled={isUploading}>
                   Back
                 </motion.button>
               )}
               <motion.button
                 onClick={step < 4 ? () => setStep(step + 1) : handleSubmit}
-                className="flex-1 px-6 py-3 rounded-xl gradient-primary text-primary-foreground font-medium glow-primary"
+                disabled={isUploading}
+                className="flex-1 px-6 py-3 rounded-xl gradient-primary text-primary-foreground font-medium glow-primary flex items-center justify-center gap-2 disabled:opacity-50"
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               >
-                {step < 4 ? "Continue" : "Submit Track"}
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Uploading...
+                  </>
+                ) : step < 4 ? "Continue" : "Submit Track"}
               </motion.button>
             </div>
           </motion.div>
