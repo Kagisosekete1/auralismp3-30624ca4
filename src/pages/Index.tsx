@@ -188,7 +188,7 @@ const Index = () => {
       <CreatePlaylistModal isOpen={showCreatePlaylist} onClose={() => setShowCreatePlaylist(false)} onCreate={handleCreatePlaylist} />
       <AddTrackModal isOpen={showAddTrack} onClose={() => setShowAddTrack(false)} onAdd={() => {}} playlistName="" />
       <UploadMusicModal isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} />
-      <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={(t) => playTrack(t)} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
+      <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={(t) => playTrack({ id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl, coverUrl: t.coverUrl, duration: t.duration })} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
     </motion.div>
   );
 };

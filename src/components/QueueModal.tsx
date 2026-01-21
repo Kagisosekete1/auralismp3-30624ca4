@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Music2, Play, Trash2, GripVertical } from "lucide-react";
+import { QueueTrack } from "@/hooks/useQueue";
 
-interface Track {
+interface NowPlayingTrack {
   id: string;
   title: string;
   artist: string;
@@ -13,12 +14,12 @@ interface Track {
 interface QueueModalProps {
   isOpen: boolean;
   onClose: () => void;
-  queue: Track[];
-  currentTrack: Track | null;
-  onPlayTrack: (track: Track) => void;
+  queue: QueueTrack[];
+  currentTrack: NowPlayingTrack | null;
+  onPlayTrack: (track: QueueTrack) => void;
   onRemoveFromQueue: (trackId: string) => void;
   onClearQueue: () => void;
-  history: Track[];
+  history: QueueTrack[];
 }
 
 const QueueModal = ({ 

@@ -70,51 +70,24 @@ const ArtistsPage = () => {
         </div>
       </section>
 
-      {/* Featured Artists */}
+      {/* Featured Artists - Empty state waiting for real artists */}
       <section className="px-4 md:px-8 py-6">
         <h2 className="text-xl md:text-2xl font-display font-bold text-foreground mb-4 md:mb-6">
           Featured Artists
         </h2>
-        <motion.div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {/* Empty artist cards as placeholders */}
-          {[1, 2, 3, 4, 5, 6].map((_, index) => (
-            <motion.button
-              key={index}
-              className="group glass rounded-xl md:rounded-2xl p-4 md:p-6 text-center border border-border/30 hover:border-primary/30 transition-all"
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full gradient-secondary mx-auto mb-4 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <Mic2 className="w-8 h-8 md:w-10 md:h-10 text-secondary-foreground" />
-                <motion.div
-                  className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-                </motion.div>
-              </div>
-              <h3 className="font-display font-bold text-foreground text-sm md:text-base mb-1 group-hover:text-primary transition-colors">
-                Artist Name
-              </h3>
-              <p className="text-xs md:text-sm text-muted-foreground mb-3">
-                0 followers
-              </p>
-              <motion.div
-                className="flex items-center justify-center gap-1 text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                whileHover={{ scale: 1.05 }}
-              >
-                <UserPlus className="w-3 h-3" />
-                Follow
-              </motion.div>
-            </motion.button>
-          ))}
-        </motion.div>
+        <div className="glass rounded-2xl p-8 md:p-12 text-center border border-border/30">
+          <div className="w-16 h-16 rounded-full gradient-secondary flex items-center justify-center mx-auto mb-4">
+            <Mic2 className="w-8 h-8 text-secondary-foreground" />
+          </div>
+          <h3 className="text-lg font-display font-bold text-foreground mb-2">
+            No featured artists yet
+          </h3>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">
+            Artists will appear here as they upload music
+          </p>
+        </div>
       </section>
+
     </div>
   );
 };
