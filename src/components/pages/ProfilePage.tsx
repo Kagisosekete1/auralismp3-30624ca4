@@ -1,12 +1,22 @@
 import { motion } from "framer-motion";
 import { User, Music2, Heart, Clock, Play, TrendingUp, Users, Edit, Camera } from "lucide-react";
 
-interface ProfilePageProps {
-  likedCount: number;
-  playlistCount: number;
+interface Track {
+  id: string;
+  title: string;
+  artist_name: string;
+  audio_url: string;
+  cover_url?: string;
+  duration?: number;
 }
 
-const ProfilePage = ({ likedCount, playlistCount }: ProfilePageProps) => {
+export interface ProfilePageProps {
+  likedCount: number;
+  playlistCount: number;
+  tracks?: Track[];
+}
+
+const ProfilePage = ({ likedCount, playlistCount, tracks = [] }: ProfilePageProps) => {
   const stats = [
     { label: "Followers", value: "0", icon: Users },
     { label: "Following", value: "0", icon: Users },

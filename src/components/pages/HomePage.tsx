@@ -3,14 +3,25 @@ import { Music2, Disc3, Mic2, TrendingUp, Clock, Sparkles, Play, Plus, Upload } 
 import EmptyState from "../EmptyState";
 import type { Playlist } from "@/hooks/useAppState";
 
-interface HomePageProps {
+interface Track {
+  id: string;
+  title: string;
+  artist_name: string;
+  audio_url: string;
+  cover_url?: string;
+  duration?: number;
+}
+
+export interface HomePageProps {
   playlists: Playlist[];
   onCreatePlaylist: () => void;
   onSelectPlaylist: (id: string) => void;
   onUploadMusic: () => void;
+  tracks?: Track[];
+  onPlayTrack?: (track: Track) => void;
 }
 
-const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic }: HomePageProps) => {
+const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack }: HomePageProps) => {
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";

@@ -1,7 +1,21 @@
 import { motion } from "framer-motion";
 import { Disc3, TrendingUp, Sparkles, Clock, Music2, Play } from "lucide-react";
 
-const ExplorePage = () => {
+interface Track {
+  id: string;
+  title: string;
+  artist_name: string;
+  audio_url: string;
+  cover_url?: string;
+  duration?: number;
+}
+
+interface ExplorePageProps {
+  tracks?: Track[];
+  onPlayTrack?: (track: Track) => void;
+}
+
+const ExplorePage = ({ tracks = [], onPlayTrack }: ExplorePageProps) => {
   const categories = [
     { name: "New Releases", icon: Sparkles, gradient: "from-primary to-accent" },
     { name: "Trending", icon: TrendingUp, gradient: "from-secondary to-primary" },
