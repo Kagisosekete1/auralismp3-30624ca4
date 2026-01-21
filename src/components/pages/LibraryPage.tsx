@@ -3,15 +3,26 @@ import { Library, Music2, Heart, Clock, Download, Plus, Play } from "lucide-reac
 import type { Playlist } from "@/hooks/useAppState";
 import EmptyState from "../EmptyState";
 
-interface LibraryPageProps {
+interface Track {
+  id: string;
+  title: string;
+  artist_name: string;
+  audio_url: string;
+  cover_url?: string;
+  duration?: number;
+}
+
+export interface LibraryPageProps {
   playlists: Playlist[];
   likedCount: number;
   onCreatePlaylist: () => void;
   onSelectPlaylist: (id: string) => void;
   onLikedSongs: () => void;
+  tracks?: Track[];
+  onPlayTrack?: (track: Track) => void;
 }
 
-const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist, onLikedSongs }: LibraryPageProps) => {
+const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist, onLikedSongs, tracks = [], onPlayTrack }: LibraryPageProps) => {
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
