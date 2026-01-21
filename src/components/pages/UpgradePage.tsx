@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Crown, Check, Zap, Music2, Download, Mic2, Sparkles } from "lucide-react";
+import { Crown, Check, Zap, Music2, Download, Mic2, Sparkles, ExternalLink } from "lucide-react";
 
 const UpgradePage = () => {
   const plans = [
@@ -10,8 +10,9 @@ const UpgradePage = () => {
       features: [
         "Stream unlimited music",
         "Create up to 10 playlists",
+        "10 songs per playlist",
         "Basic audio quality",
-        "Ads included",
+        "Ads every 3 songs",
       ],
       current: true,
     },
@@ -28,6 +29,7 @@ const UpgradePage = () => {
         "Priority support",
       ],
       popular: true,
+      paypalLink: "https://www.paypal.com/ncp/payment/EPM7DZ5RLNMEG",
     },
     {
       name: "Artist",
@@ -42,6 +44,7 @@ const UpgradePage = () => {
         "Direct fan messaging",
         "Revenue share: 80%",
       ],
+      paypalLink: "https://www.paypal.com/ncp/payment/GQDMSECZ28LJL",
     },
   ];
 
@@ -51,6 +54,12 @@ const UpgradePage = () => {
     { icon: Download, title: "Offline Mode", description: "Download music to listen anywhere" },
     { icon: Mic2, title: "Artist Tools", description: "Get detailed analytics and fan insights" },
   ];
+
+  const handleUpgrade = (paypalLink?: string) => {
+    if (paypalLink) {
+      window.open(paypalLink, "_blank");
+    }
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -128,7 +137,8 @@ const UpgradePage = () => {
                 ))}
               </ul>
               <motion.button
-                className={`w-full py-3 rounded-xl font-medium transition-colors ${
+                onClick={() => handleUpgrade(plan.paypalLink)}
+                className={`w-full py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
                   plan.current
                     ? 'bg-surface-elevated text-muted-foreground cursor-default'
                     : plan.popular
@@ -139,7 +149,12 @@ const UpgradePage = () => {
                 whileTap={!plan.current ? { scale: 0.98 } : {}}
                 disabled={plan.current}
               >
-                {plan.current ? 'Current Plan' : 'Upgrade Now'}
+                {plan.current ? 'Current Plan' : (
+                  <>
+                    Upgrade Now
+                    <ExternalLink className="w-4 h-4" />
+                  </>
+                )}
               </motion.button>
             </motion.div>
           ))}

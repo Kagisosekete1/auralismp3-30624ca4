@@ -38,6 +38,14 @@ interface NowPlayingBarProps {
   isMuted?: boolean;
   onToggleMute?: () => void;
   formatTime?: (seconds: number) => string;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  onShuffle?: () => void;
+  onRepeat?: () => void;
+  isShuffled?: boolean;
+  repeatMode?: "off" | "all" | "one";
+  onShowQueue?: () => void;
+  onTrackClick?: () => void;
 }
 
 const NowPlayingBar = ({ 
@@ -54,9 +62,15 @@ const NowPlayingBar = ({
   isMuted = false,
   onToggleMute,
   formatTime,
+  onNext,
+  onPrevious,
+  onShuffle,
+  onRepeat,
+  isShuffled = false,
+  repeatMode = "off",
+  onShowQueue,
+  onTrackClick,
 }: NowPlayingBarProps) => {
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
   const [localVolume, setLocalVolume] = useState(volume);
   const [localMuted, setLocalMuted] = useState(isMuted);
 
@@ -97,9 +111,10 @@ const NowPlayingBar = ({
       {/* Left - Current Track */}
       <div className="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] min-w-0">
         <motion.div
-          className="relative flex-shrink-0"
+          className="relative flex-shrink-0 cursor-pointer"
           animate={{ rotate: isPlaying ? 360 : 0 }}
           transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
+          onClick={onTrackClick}
         >
           {currentTrack.coverUrl ? (
             <img 
@@ -119,7 +134,7 @@ const NowPlayingBar = ({
           />
         </motion.div>
         
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1" onClick={onTrackClick}>
           <motion.p 
             className="font-semibold text-foreground truncate hover:text-primary cursor-pointer transition-colors text-sm md:text-base"
             whileHover={{ x: 2 }}
@@ -147,8 +162,8 @@ const NowPlayingBar = ({
       <div className="flex flex-col items-center max-w-[30%] md:max-w-[40%] w-full">
         <div className="flex items-center gap-3 md:gap-5 mb-2 md:mb-3">
           <motion.button
-            onClick={() => setIsShuffle(!isShuffle)}
-            className={`hidden md:block transition-colors ${isShuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={onShuffle}
+            className={`hidden md:block transition-colors ${isShuffled ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
@@ -156,6 +171,7 @@ const NowPlayingBar = ({
           </motion.button>
           
           <motion.button 
+            onClick={onPrevious}
             className="text-muted-foreground hover:text-foreground transition-colors"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -193,6 +209,7 @@ const NowPlayingBar = ({
           </motion.button>
           
           <motion.button 
+            onClick={onNext}
             className="text-muted-foreground hover:text-foreground transition-colors"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -201,7 +218,7 @@ const NowPlayingBar = ({
           </motion.button>
           
           <motion.button
-            onClick={() => setRepeatMode(repeatMode === "off" ? "all" : repeatMode === "all" ? "one" : "off")}
+            onClick={onRepeat}
             className={`hidden md:block relative transition-colors ${repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -263,6 +280,7 @@ const NowPlayingBar = ({
         </motion.button>
         
         <motion.button 
+          onClick={onShowQueue}
           className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}

@@ -10,7 +10,7 @@ import MobileNav from "@/components/MobileNav";
 import CreatePlaylistModal from "@/components/CreatePlaylistModal";
 import AddTrackModal from "@/components/AddTrackModal";
 import UploadMusicModal from "@/components/UploadMusicModal";
-import PlaylistView from "@/components/PlaylistView";
+import QueueModal from "@/components/QueueModal";
 import HomePage from "@/components/pages/HomePage";
 import ExplorePage from "@/components/pages/ExplorePage";
 import GenrePage from "@/components/pages/GenrePage";
@@ -23,21 +23,23 @@ import UpgradePage from "@/components/pages/UpgradePage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useQueue } from "@/hooks/useQueue";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { tracks, playlists, likedTrackIds, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
   const { currentTrack, isPlaying, progress, duration, volume, isMuted, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
+  const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
 
   const [activeSection, setActiveSection] = useState("home");
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [showUploadMusic, setShowUploadMusic] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Redirect to auth if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -78,14 +80,16 @@ const Index = () => {
   };
 
   const handlePlayTrack = (track: any) => {
-    playTrack({
+    const audioTrack = {
       id: track.id,
       title: track.title || track.name,
       artist: track.artist_name || track.artist,
       audioUrl: track.audio_url || track.audioUrl,
       coverUrl: track.cover_url || track.coverUrl,
       duration: track.duration,
-    });
+    };
+    playTrack(audioTrack);
+    addToQueue(audioTrack);
   };
 
   const handleToggleLikeCurrentTrack = () => {
@@ -95,7 +99,11 @@ const Index = () => {
     }
   };
 
-  // Convert playlists for sidebar
+  const handleRemoveFromQueue = (trackId: string) => {
+    const index = queue.findIndex(t => t.id === trackId);
+    if (index !== -1) removeFromQueue(index);
+  };
+
   const sidebarPlaylists = playlists.map((p) => ({
     id: p.id,
     name: p.name,
@@ -126,9 +134,9 @@ const Index = () => {
       case "library":
         return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "profile":
-        return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} />;
+        return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "settings":
-        return <SettingsPage />;
+        return <SettingsPage onSectionChange={handleSectionChange} />;
       case "notifications":
         return <NotificationsPage />;
       case "upgrade":
@@ -138,38 +146,17 @@ const Index = () => {
     }
   };
 
-  const nowPlayingTrack = currentTrack ? {
-    id: currentTrack.id,
-    title: currentTrack.title,
-    artist: currentTrack.artist,
-    coverUrl: currentTrack.coverUrl,
-    duration: currentTrack.duration,
-  } : null;
+  const nowPlayingTrack = currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist, coverUrl: currentTrack.coverUrl, duration: currentTrack.duration } : null;
 
   return (
     <motion.div className="h-screen flex flex-col bg-background overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - hidden on mobile */}
         <div className={`hidden md:block ${sidebarOpen ? 'w-72' : 'w-0'} transition-all`}>
-          <Sidebar
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-            playlists={sidebarPlaylists}
-            onCreatePlaylist={() => setShowCreatePlaylist(true)}
-            onDeletePlaylist={handleDeletePlaylist}
-            likedCount={likedTrackIds.length}
-            onUploadMusic={() => setShowUploadMusic(true)}
-          />
+          <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onDeletePlaylist={handleDeletePlaylist} likedCount={likedTrackIds.length} onUploadMusic={() => setShowUploadMusic(true)} />
         </div>
-
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar
-            onSectionChange={handleSectionChange}
-            onUploadMusic={() => setShowUploadMusic(true)}
-          />
-          <div className="flex-1 overflow-y-auto pb-36 md:pb-24">
-            {renderContent()}
-          </div>
+          <TopBar onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />
+          <div className="flex-1 overflow-y-auto pb-36 md:pb-24">{renderContent()}</div>
         </div>
       </div>
 
@@ -187,19 +174,21 @@ const Index = () => {
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(!isMuted)}
         formatTime={formatTime}
+        onNext={() => playNext()}
+        onPrevious={() => playPrevious()}
+        onShuffle={toggleShuffle}
+        onRepeat={cycleRepeat}
+        isShuffled={shuffleEnabled}
+        repeatMode={repeatMode}
+        onShowQueue={() => setShowQueue(true)}
       />
 
-      {/* Mobile Bottom Navigation */}
-      <MobileNav
-        activeSection={activeSection}
-        onSectionChange={handleSectionChange}
-        onUploadMusic={() => setShowUploadMusic(true)}
-      />
+      <MobileNav activeSection={activeSection} onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} />
 
-      {/* Modals */}
       <CreatePlaylistModal isOpen={showCreatePlaylist} onClose={() => setShowCreatePlaylist(false)} onCreate={handleCreatePlaylist} />
       <AddTrackModal isOpen={showAddTrack} onClose={() => setShowAddTrack(false)} onAdd={() => {}} playlistName="" />
       <UploadMusicModal isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} />
+      <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={(t) => playTrack(t)} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
     </motion.div>
   );
 };
