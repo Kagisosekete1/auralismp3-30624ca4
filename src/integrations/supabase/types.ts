@@ -64,6 +64,35 @@ export type Database = {
           },
         ]
       }
+      play_history: {
+        Row: {
+          id: string
+          played_at: string
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          played_at?: string
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          played_at?: string
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_history_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_tracks: {
         Row: {
           added_at: string
@@ -138,6 +167,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      posts: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          track_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
