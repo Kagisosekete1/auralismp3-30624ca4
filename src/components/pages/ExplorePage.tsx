@@ -120,20 +120,65 @@ const ExplorePage = ({ tracks = [], onPlayTrack }: ExplorePageProps) => {
         </motion.div>
       </section>
 
-      {/* Empty State for Recommended */}
+      {/* All Tracks Section */}
       <section className="px-4 md:px-8 py-6">
         <h2 className="text-xl md:text-2xl font-display font-bold text-foreground mb-4 md:mb-6">
-          Recommended for You
+          All Tracks
         </h2>
-        <div className="glass rounded-2xl p-8 md:p-12 text-center border border-border/30">
-          <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-display font-bold text-foreground mb-2">
-            No recommendations yet
-          </h3>
-          <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Start listening to music and we'll personalize your recommendations based on your taste
-          </p>
-        </div>
+        {tracks.length === 0 ? (
+          <div className="glass rounded-2xl p-8 md:p-12 text-center border border-border/30">
+            <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-display font-bold text-foreground mb-2">
+              No tracks uploaded yet
+            </h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              Be the first to upload music! Tracks uploaded by artists will appear here for everyone to enjoy.
+            </p>
+          </div>
+        ) : (
+          <motion.div 
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {tracks.map((track) => (
+              <motion.button
+                key={track.id}
+                onClick={() => onPlayTrack?.(track)}
+                className="group glass rounded-xl md:rounded-2xl p-3 md:p-4 text-left border border-border/30 hover:border-primary/30 transition-all"
+                variants={itemVariants}
+                whileHover={{ y: -8 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="relative w-full aspect-square rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 md:mb-4 group-hover:scale-105 transition-transform overflow-hidden">
+                  {track.cover_url ? (
+                    <img 
+                      src={track.cover_url} 
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Music2 className="w-8 md:w-12 h-8 md:h-12 text-primary/60" />
+                  )}
+                  <motion.div
+                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
+                      <Play className="w-5 h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+                    </div>
+                  </motion.div>
+                </div>
+                <h3 className="font-display font-bold text-foreground text-sm md:text-base mb-0.5 md:mb-1 truncate group-hover:text-primary transition-colors">
+                  {track.title}
+                </h3>
+                <p className="text-xs md:text-sm text-muted-foreground truncate">
+                  {track.artist_name}
+                </p>
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
       </section>
     </div>
   );

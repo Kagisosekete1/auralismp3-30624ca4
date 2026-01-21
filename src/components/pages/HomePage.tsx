@@ -125,7 +125,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           transition={{ delay: 0.2 }}
         >
           {[
-            { icon: Music2, label: "Total Tracks", value: "0" },
+            { icon: Music2, label: "Total Tracks", value: tracks.length.toString() },
             { icon: Disc3, label: "Playlists", value: playlists.length.toString() },
             { icon: TrendingUp, label: "Plays", value: "0" },
             { icon: Clock, label: "Listen Time", value: "0h" },
@@ -141,6 +141,68 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           ))}
         </motion.div>
       </section>
+
+      {/* Recently Uploaded Tracks */}
+      {tracks.length > 0 && (
+        <section className="px-4 md:px-8 py-6">
+          <motion.div 
+            className="flex items-center gap-3 mb-6"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-display font-bold text-foreground">Recently Uploaded</h2>
+              <p className="text-xs md:text-sm text-muted-foreground">Fresh tracks from the community</p>
+            </div>
+          </motion.div>
+
+          <motion.div 
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {tracks.slice(0, 12).map((track) => (
+              <motion.button
+                key={track.id}
+                onClick={() => onPlayTrack?.(track)}
+                className="group glass rounded-xl md:rounded-2xl p-3 md:p-4 text-left border border-border/30 hover:border-primary/30 transition-all"
+                variants={itemVariants}
+                whileHover={{ y: -8 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="relative w-full aspect-square rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 md:mb-4 group-hover:scale-105 transition-transform overflow-hidden">
+                  {track.cover_url ? (
+                    <img 
+                      src={track.cover_url} 
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Music2 className="w-8 md:w-12 h-8 md:h-12 text-primary/60" />
+                  )}
+                  <motion.div
+                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
+                      <Play className="w-5 h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+                    </div>
+                  </motion.div>
+                </div>
+                <h3 className="font-display font-bold text-foreground text-sm md:text-base mb-0.5 md:mb-1 truncate group-hover:text-primary transition-colors">
+                  {track.title}
+                </h3>
+                <p className="text-xs md:text-sm text-muted-foreground truncate">
+                  {track.artist_name}
+                </p>
+              </motion.button>
+            ))}
+          </motion.div>
+        </section>
+      )}
 
       {/* Your Playlists Section */}
       <section className="px-4 md:px-8 py-6">
