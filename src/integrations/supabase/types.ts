@@ -14,6 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
+      albums: {
+        Row: {
+          artist_name: string
+          composition_copyright: string | null
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          has_cover_versions: boolean | null
+          id: string
+          is_approved: boolean | null
+          is_compilation: boolean | null
+          is_explicit: boolean | null
+          language: string | null
+          pre_order_date: string | null
+          primary_genre: string | null
+          record_label: string | null
+          recording_copyright: string | null
+          release_date: string | null
+          release_type: string | null
+          sales_start_date: string | null
+          secondary_genre: string | null
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          artist_name: string
+          composition_copyright?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          has_cover_versions?: boolean | null
+          id?: string
+          is_approved?: boolean | null
+          is_compilation?: boolean | null
+          is_explicit?: boolean | null
+          language?: string | null
+          pre_order_date?: string | null
+          primary_genre?: string | null
+          record_label?: string | null
+          recording_copyright?: string | null
+          release_date?: string | null
+          release_type?: string | null
+          sales_start_date?: string | null
+          secondary_genre?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          artist_name?: string
+          composition_copyright?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          has_cover_versions?: boolean | null
+          id?: string
+          is_approved?: boolean | null
+          is_compilation?: boolean | null
+          is_explicit?: boolean | null
+          language?: string | null
+          pre_order_date?: string | null
+          primary_genre?: string | null
+          record_label?: string | null
+          recording_copyright?: string | null
+          release_date?: string | null
+          release_type?: string | null
+          sales_start_date?: string | null
+          secondary_genre?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -63,6 +173,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: []
       }
       play_history: {
         Row: {
@@ -168,11 +305,86 @@ export type Database = {
         }
         Relationships: []
       }
+      post_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          parent_comment_id: string | null
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          post_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          post_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           content: string | null
           created_at: string
           id: string
+          image_url: string | null
           track_id: string | null
           updated_at: string
           user_id: string
@@ -181,6 +393,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           track_id?: string | null
           updated_at?: string
           user_id: string
@@ -189,6 +402,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           track_id?: string | null
           updated_at?: string
           user_id?: string
@@ -215,6 +429,8 @@ export type Database = {
           id: string
           instagram: string | null
           is_artist: boolean | null
+          short_reel_url: string | null
+          subscription_tier: string | null
           tiktok: string | null
           total_plays: number | null
           updated_at: string
@@ -233,6 +449,8 @@ export type Database = {
           id?: string
           instagram?: string | null
           is_artist?: boolean | null
+          short_reel_url?: string | null
+          subscription_tier?: string | null
           tiktok?: string | null
           total_plays?: number | null
           updated_at?: string
@@ -251,6 +469,8 @@ export type Database = {
           id?: string
           instagram?: string | null
           is_artist?: boolean | null
+          short_reel_url?: string | null
+          subscription_tier?: string | null
           tiktok?: string | null
           total_plays?: number | null
           updated_at?: string
@@ -263,6 +483,7 @@ export type Database = {
       tracks: {
         Row: {
           album: string | null
+          album_id: string | null
           artist_name: string
           audio_url: string
           bpm: number | null
@@ -287,6 +508,7 @@ export type Database = {
         }
         Insert: {
           album?: string | null
+          album_id?: string | null
           artist_name: string
           audio_url: string
           bpm?: number | null
@@ -311,6 +533,7 @@ export type Database = {
         }
         Update: {
           album?: string | null
+          album_id?: string | null
           artist_name?: string
           audio_url?: string
           bpm?: number | null
@@ -333,7 +556,15 @@ export type Database = {
           version?: string | null
           video_reel_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tracks_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
