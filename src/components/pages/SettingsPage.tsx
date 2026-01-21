@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown } from "lucide-react";
+import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown, Shield, FileText, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -14,10 +14,18 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
   const [autoplay, setAutoplay] = useState(true);
   const [highQuality, setHighQuality] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
     toast.success("Logged out successfully");
+  };
+
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
+    document.documentElement.classList.toggle("dark", !darkMode);
+    toast.success(`Switched to ${!darkMode ? "dark" : "light"} mode`);
   };
 
   const settingsSections = [
@@ -25,18 +33,25 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
       title: "Account",
       items: [
         { icon: User, label: "Profile", description: "Manage your profile information", action: () => onSectionChange?.("profile") },
-        { icon: Lock, label: "Privacy & Security", description: "Password and security settings", action: () => toast.info("Privacy settings coming soon") },
+        { icon: Shield, label: "Privacy & Security", description: "Password and security settings", action: () => setShowPrivacy(true) },
         { icon: CreditCard, label: "Subscription", description: "Manage your plan", action: () => onSectionChange?.("upgrade") },
       ]
     },
     {
       title: "Preferences",
       items: [
-        { icon: Palette, label: "Appearance", description: "Theme and display settings", action: () => setDarkMode(!darkMode), toggle: true },
+        { icon: Palette, label: "Appearance", description: darkMode ? "Dark Mode" : "Light Mode", action: toggleTheme, toggle: true },
         { icon: Globe, label: "Language", description: "English (US)", action: () => toast.info("Language settings coming soon") },
         { icon: Volume2, label: "Audio Quality", description: highQuality ? "High (Premium)" : "Normal", action: () => {
           if (!highQuality) toast.info("Upgrade to Premium for high quality audio");
         }, premium: true },
+      ]
+    },
+    {
+      title: "Legal",
+      items: [
+        { icon: FileText, label: "Terms of Use", description: "Read our terms", action: () => setShowTerms(true) },
+        { icon: Lock, label: "Privacy Policy", description: "How we protect your data", action: () => setShowPrivacy(true) },
       ]
     },
   ];
@@ -44,8 +59,66 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
   const itemVariants = { hidden: { opacity: 0, x: -20 }, visible: { opacity: 1, x: 0 } };
 
+  // Privacy Policy Modal
+  const PrivacyModal = () => (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={() => setShowPrivacy(false)}
+    >
+      <motion.div
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto glass rounded-2xl border border-border/50 p-6"
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-display font-bold text-foreground mb-4">Privacy Policy</h2>
+        <div className="prose prose-sm prose-invert max-w-none text-muted-foreground space-y-4">
+          <p><strong>1. Information We Collect:</strong> Account details (name, email), Uploaded content & metadata, Usage analytics, Payment data (via secure third parties)</p>
+          <p><strong>2. How We Use Your Data:</strong> To operate and improve the Platform, To process uploads and distributions, To communicate important updates, To comply with legal obligations</p>
+          <p><strong>3. Data Sharing:</strong> We do NOT sell your data. We only share data with: Payment processors, Distribution partners (if enabled), Legal authorities if required by law</p>
+          <p><strong>4. Data Security:</strong> We use industry-standard security measures. However, no system is 100% secure.</p>
+          <p><strong>5. Your Rights:</strong> You may request access, correction, or deletion of your personal data by contacting support@auralis.app</p>
+          <p><strong>6. Cookies:</strong> We use cookies for functionality and analytics. You can manage cookies via your browser settings.</p>
+          <p><strong>Quick Summary:</strong> We only collect what we need to run the app. We never sell your data. Your music and personal info stay yours. You can request deletion of your account and data.</p>
+        </div>
+        <button onClick={() => setShowPrivacy(false)} className="mt-6 px-6 py-2 rounded-xl gradient-primary text-primary-foreground font-medium">Close</button>
+      </motion.div>
+    </motion.div>
+  );
+
+  // Terms Modal
+  const TermsModal = () => (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={() => setShowTerms(false)}
+    >
+      <motion.div
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto glass rounded-2xl border border-border/50 p-6"
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-display font-bold text-foreground mb-4">Terms of Use</h2>
+        <div className="prose prose-sm prose-invert max-w-none text-muted-foreground space-y-4">
+          <p><strong>1. Acceptance of Terms:</strong> By accessing or using the Auralis platform, you agree to be bound by these Terms of Use.</p>
+          <p><strong>2. Eligibility:</strong> You must be at least 18 years old or have legal guardian consent to upload content.</p>
+          <p><strong>3. Ownership & Rights:</strong> You retain 100% ownership of your music, artwork, and metadata. By uploading content, you grant Auralis a non-exclusive, royalty-free, worldwide license to host, stream, display, distribute, and promote your content solely for platform operation and marketing purposes.</p>
+          <p><strong>4. Content Warranty:</strong> You confirm that you own or control all rights to the submitted content, your content does not infringe any third-party rights, and your content is not illegal, offensive, or misleading.</p>
+          <p><strong>5. Monetization:</strong> Free uploads do not guarantee monetization or distribution to third-party platforms. Premium features may enable additional monetization tools.</p>
+          <p><strong>6. Termination:</strong> You may remove your content at any time. Auralis may suspend accounts for violations, fraud, or abuse.</p>
+          <p><strong>7. Limitation of Liability:</strong> Auralis is provided "as is." We are not liable for loss of revenue, data, or opportunities arising from platform use.</p>
+          <p><strong>Quick Summary:</strong> Auralis is free to use for listening and uploading music. You keep full ownership of your music at all times. We do not pay royalties and we do not charge fees. You can remove your music anytime.</p>
+        </div>
+        <button onClick={() => setShowTerms(false)} className="mt-6 px-6 py-2 rounded-xl gradient-primary text-primary-foreground font-medium">Close</button>
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <div className="flex-1 overflow-y-auto pb-32">
+      {showPrivacy && <PrivacyModal />}
+      {showTerms && <TermsModal />}
+
       {/* Header */}
       <div className="gradient-hero pt-6 md:pt-8 pb-8 md:pb-12 px-4 md:px-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
