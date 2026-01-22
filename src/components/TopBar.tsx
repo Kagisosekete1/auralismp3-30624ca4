@@ -2,6 +2,8 @@ import { Bell, Settings, User, ChevronLeft, ChevronRight, Search, Upload } from 
 import { motion } from "framer-motion";
 import { useState } from "react";
 import SearchModal from "./SearchModal";
+import AuralisLogo from "./AuralisLogo";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TopBarProps {
   onSearch?: (query: string) => void;
@@ -13,12 +15,26 @@ interface TopBarProps {
 
 const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack }: TopBarProps) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const isMobile = useIsMobile();
 
   return (
     <>
-      <header className="h-16 md:h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 glass-strong border-b border-border/30">
-        {/* Left - Navigation & Search */}
+      <header className="h-14 md:h-20 flex items-center justify-between px-3 md:px-8 sticky top-0 z-10 glass-strong border-b border-border/30">
+        {/* Left - Logo (mobile) & Navigation & Search */}
         <div className="flex items-center gap-2 md:gap-4 flex-1">
+          {/* Mobile Logo */}
+          {isMobile && (
+            <motion.button 
+              onClick={() => onSectionChange?.("home")}
+              className="flex items-center gap-2 mr-1"
+              whileHover={{ scale: 1.02 }} 
+              whileTap={{ scale: 0.98 }}
+            >
+              <AuralisLogo size={32} />
+            </motion.button>
+          )}
+
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-2">
             <motion.button 
               onClick={() => window.history.back()}
@@ -38,14 +54,19 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
             </motion.button>
           </div>
 
-          {/* Search Bar - Opens Modal */}
+          {/* Search Button - Native mobile style */}
           <motion.button 
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center gap-2 flex-1 max-w-xs md:max-w-md px-4 py-2 md:py-2.5 rounded-xl bg-surface-elevated/50 border border-border/50 hover:border-primary/50 text-muted-foreground transition-all text-sm"
-            whileHover={{ scale: 1.01 }}
+            className={`flex items-center gap-2 ${
+              isMobile 
+                ? "w-10 h-10 rounded-full bg-surface-elevated justify-center" 
+                : "flex-1 max-w-md px-4 py-2.5 rounded-xl bg-surface-elevated/50 border border-border/50 hover:border-primary/50"
+            } text-muted-foreground transition-all text-sm`}
+            whileHover={{ scale: isMobile ? 1.1 : 1.01 }}
+            whileTap={{ scale: 0.95 }}
           >
             <Search className="w-4 h-4" />
-            <span>Search tracks, artists, genres...</span>
+            {!isMobile && <span>Search tracks, artists, genres...</span>}
           </motion.button>
         </div>
 

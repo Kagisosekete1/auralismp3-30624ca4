@@ -2,6 +2,7 @@ import { Home, Search, Library, Plus, Heart, Music2, Radio, Mic2, Disc3, Trash2,
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import type { Playlist } from "@/hooks/useAppState";
+import AuralisLogo from "./AuralisLogo";
 
 interface SidebarProps {
   activeSection: string;
@@ -29,9 +30,7 @@ const Sidebar = ({ activeSection, onSectionChange, playlists, onCreatePlaylist, 
       {/* Logo */}
       <div className="p-6 pb-4">
         <motion.button className="flex items-center gap-3" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => onSectionChange("home")}>
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
-            <Music2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <AuralisLogo size={42} />
           <h1 className="text-xl font-display font-bold text-gradient">Auralis</h1>
         </motion.button>
       </div>
