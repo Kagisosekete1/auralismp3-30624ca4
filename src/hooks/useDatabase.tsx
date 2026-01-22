@@ -52,6 +52,8 @@ export interface DbProfile {
   followers_count: number;
   total_plays: number;
   is_artist: boolean;
+  subscription_tier?: string;
+  short_reel_url?: string;
 }
 
 export const useDatabase = () => {

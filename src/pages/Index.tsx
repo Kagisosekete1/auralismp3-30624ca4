@@ -28,8 +28,8 @@ import { useQueue } from "@/hooks/useQueue";
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { tracks, playlists, likedTrackIds, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
-  const { currentTrack, isPlaying, progress, duration, volume, isMuted, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
+  const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
   const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
 
   const [activeSection, setActiveSection] = useState("home");
@@ -181,6 +181,7 @@ const Index = () => {
         isShuffled={shuffleEnabled}
         repeatMode={repeatMode}
         onShowQueue={() => setShowQueue(true)}
+        isPremium={isPremium}
       />
 
       <MobileNav activeSection={activeSection} onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} />
