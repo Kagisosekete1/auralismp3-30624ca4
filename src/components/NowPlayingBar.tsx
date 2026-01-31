@@ -17,12 +17,14 @@ import {
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AuralisLogo from "./AuralisLogo";
+import VideoReelPlayer from "./VideoReelPlayer";
 
 interface NowPlayingTrack {
   id: string;
   title: string;
   artist: string;
   coverUrl?: string;
+  videoReelUrl?: string;
   duration?: number;
 }
 
@@ -134,11 +136,18 @@ const NowPlayingBar = ({
           <div className="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] min-w-0">
             <motion.div
               className="relative flex-shrink-0 cursor-pointer"
-              animate={{ rotate: isPlaying ? 360 : 0 }}
-              transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
+              animate={{ rotate: currentTrack.videoReelUrl ? 0 : (isPlaying ? 360 : 0) }}
+              transition={{ duration: 3, repeat: isPlaying && !currentTrack.videoReelUrl ? Infinity : 0, ease: "linear" }}
               onClick={onTrackClick}
             >
-              {currentTrack.coverUrl ? (
+              {currentTrack.videoReelUrl ? (
+                <VideoReelPlayer
+                  videoUrl={currentTrack.videoReelUrl}
+                  isPlaying={isPlaying}
+                  coverUrl={currentTrack.coverUrl}
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg"
+                />
+              ) : currentTrack.coverUrl ? (
                 <img 
                   src={currentTrack.coverUrl} 
                   alt={currentTrack.title}

@@ -90,6 +90,7 @@ const Index = () => {
       artist: track.artist_name || track.artist,
       audioUrl: track.audio_url || track.audioUrl,
       coverUrl: track.cover_url || track.coverUrl,
+      videoReelUrl: track.video_reel_url || track.videoReelUrl,
       duration: track.duration,
     };
     playTrack(audioTrack);
@@ -174,7 +175,7 @@ const Index = () => {
     }
   };
 
-  const nowPlayingTrack = currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist, coverUrl: currentTrack.coverUrl, duration: currentTrack.duration } : null;
+  const nowPlayingTrack = currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist, coverUrl: currentTrack.coverUrl, videoReelUrl: currentTrack.videoReelUrl, duration: currentTrack.duration } : null;
 
   return (
     <motion.div className="h-screen flex flex-col bg-background overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>

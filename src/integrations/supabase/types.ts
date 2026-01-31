@@ -494,6 +494,7 @@ export type Database = {
           id: string
           is_approved: boolean | null
           is_explicit: boolean | null
+          isrc_code: string | null
           key: string | null
           like_count: number | null
           mood_tags: string[] | null
@@ -519,6 +520,7 @@ export type Database = {
           id?: string
           is_approved?: boolean | null
           is_explicit?: boolean | null
+          isrc_code?: string | null
           key?: string | null
           like_count?: number | null
           mood_tags?: string[] | null
@@ -544,6 +546,7 @@ export type Database = {
           id?: string
           is_approved?: boolean | null
           is_explicit?: boolean | null
+          isrc_code?: string | null
           key?: string | null
           like_count?: number | null
           mood_tags?: string[] | null
