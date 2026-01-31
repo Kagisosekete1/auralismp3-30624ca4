@@ -8,6 +8,7 @@ export interface AudioTrack {
   artist: string;
   audioUrl: string;
   coverUrl?: string;
+  videoReelUrl?: string;
   duration?: number;
 }
 

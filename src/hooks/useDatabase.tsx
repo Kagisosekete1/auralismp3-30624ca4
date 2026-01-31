@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { generateISRC } from "@/utils/isrcGenerator";
 
 export interface DbTrack {
   id: string;
@@ -282,6 +283,9 @@ export const useDatabase = () => {
         coverUrl = coverUrlData.publicUrl;
       }
 
+      // Generate unique ISRC code
+      const isrcCode = await generateISRC();
+
       // Create track record
       const { data, error } = await supabase
         .from("tracks")
@@ -297,6 +301,7 @@ export const useDatabase = () => {
           is_explicit: trackData.isExplicit,
           version: trackData.version,
           mood_tags: trackData.moodTags,
+          isrc_code: isrcCode,
           is_approved: true, // Auto-approve for now
           status: "live",
         })

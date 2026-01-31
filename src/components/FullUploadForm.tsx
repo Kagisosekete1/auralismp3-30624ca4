@@ -600,11 +600,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     )}
                   </div>
                   
-                  <div>
+                  <div className="glass rounded-xl p-4 border border-primary/30 bg-primary/5">
                     <label className="block text-sm font-medium text-foreground mb-2">ISRC Code</label>
-                    <input className={inputClass} placeholder="Leave blank for Auralis to generate" value={formData.isrcCode} onChange={e => updateField("isrcCode", e.target.value)} />
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                      <Info className="w-3 h-3" /> Leave blank if you don't have one — Auralis can generate an ISRC for you
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 text-muted-foreground text-sm">
+                        <span className="text-primary font-mono">Auto-generated</span> upon submission
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                      <Info className="w-3 h-3" /> Auralis automatically generates a unique ISRC code for each track (format: ZA-AUR-26-XXXXX)
                     </p>
                   </div>
                 </div>
