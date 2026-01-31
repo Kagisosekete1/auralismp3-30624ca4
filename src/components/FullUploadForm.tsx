@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Upload, Music2, Check, Loader2, FileAudio, Image, Calendar, 
@@ -25,10 +25,31 @@ const languages = [
 
 const vocalTypes = ["Lead Vocal", "Background Vocal", "Instrumental Only", "Duet", "Choir"];
 
+const UPLOAD_FORM_KEY = "auralis_upload_form";
+
+const getInitialFormData = () => {
+  try {
+    const saved = sessionStorage.getItem(UPLOAD_FORM_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Check if data is fresh (within 2 hours)
+      if (Date.now() - parsed.lastUpdated < 2 * 60 * 60 * 1000) {
+        return parsed.data;
+      }
+    }
+  } catch (error) {
+    console.error("Error loading upload form data:", error);
+  }
+  return null;
+};
+
 const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => {
   const { user } = useAuth();
   const { profile, uploadTrack } = useDatabase();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const saved = getInitialFormData();
+    return saved?.step || 1;
+  });
   const [isUploading, setIsUploading] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +60,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     // Release Details
     language: "English",
     title: "",
@@ -83,9 +104,62 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     // Terms
     ownsRights: false,
     termsAgreed: false,
+  };
+
+  const [formData, setFormData] = useState(() => {
+    const saved = getInitialFormData();
+    return saved?.formData || defaultFormData;
   });
 
   const [newFeaturingArtist, setNewFeaturingArtist] = useState("");
+
+  // Save form data to sessionStorage
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const saveTimeout = setTimeout(() => {
+      try {
+        sessionStorage.setItem(UPLOAD_FORM_KEY, JSON.stringify({
+          data: { formData, step },
+          lastUpdated: Date.now(),
+        }));
+      } catch (error) {
+        console.error("Error saving upload form:", error);
+      }
+    }, 500);
+
+    return () => clearTimeout(saveTimeout);
+  }, [formData, step, isOpen]);
+
+  // Save immediately when visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isOpen) {
+        try {
+          sessionStorage.setItem(UPLOAD_FORM_KEY, JSON.stringify({
+            data: { formData, step },
+            lastUpdated: Date.now(),
+          }));
+        } catch (error) {
+          console.error("Error saving upload form on hide:", error);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [formData, step, isOpen]);
+
+  // Clear saved data on successful submit
+  const clearSavedData = () => {
+    try {
+      sessionStorage.removeItem(UPLOAD_FORM_KEY);
+    } catch (error) {
+      console.error("Error clearing upload form data:", error);
+    }
+  };
 
   const updateField = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -235,6 +309,8 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       ownsRights: false,
       termsAgreed: false,
     });
+    // Clear saved form data from session storage
+    clearSavedData();
   };
 
   const inputClass = "w-full px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all text-sm";
