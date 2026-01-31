@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Music2, Heart, Play, TrendingUp, Users, Edit, Camera, Trash2, Save, X, Loader2 } from "lucide-react";
+import { User, Music2, Heart, Play, TrendingUp, Users, Edit, Camera, Trash2, Save, X, Loader2, Plus, ImageIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,9 +23,10 @@ export interface ProfilePageProps {
   playlistCount: number;
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
+  onAddToPlaylist?: (track: Track) => void;
 }
 
-const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack }: ProfilePageProps) => {
+const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAddToPlaylist }: ProfilePageProps) => {
   const { user, signOut } = useAuth();
   const { profile, updateProfile, refetchTracks } = useDatabase();
   const [isEditing, setIsEditing] = useState(false);
@@ -308,6 +309,14 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack }: Pr
                     <span>{track.like_count || 0} likes</span>
                   </div>
                 </div>
+                <motion.button
+                  onClick={() => onAddToPlaylist?.(track)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  whileTap={{ scale: 0.9 }}
+                  title="Add to playlist"
+                >
+                  <Plus className="w-5 h-5" />
+                </motion.button>
                 <motion.button
                   onClick={() => handleDeleteTrack(track.id)}
                   className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

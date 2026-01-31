@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Music2, Users, Play, Heart, Share2, UserPlus, UserCheck, MessageCircle, Calendar, MapPin, Globe, Instagram } from "lucide-react";
+import { ArrowLeft, Music2, Users, Play, Heart, Share2, UserPlus, UserCheck, MessageCircle, Calendar, MapPin, Globe, Instagram, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -39,9 +39,10 @@ interface ArtistProfilePageProps {
   onBack: () => void;
   onPlayTrack: (track: any) => void;
   onMessage?: (userId: string) => void;
+  onAddToPlaylist?: (track: any) => void;
 }
 
-const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage }: ArtistProfilePageProps) => {
+const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAddToPlaylist }: ArtistProfilePageProps) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -51,6 +52,30 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage }: Art
 
   useEffect(() => {
     fetchArtistData();
+    
+    // Real-time subscription for follow count updates
+    const channel = supabase
+      .channel(`artist-follows-${artistUserId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'follows',
+        filter: `following_id=eq.${artistUserId}`
+      }, () => {
+        // Refetch the actual count from DB
+        supabase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("following_id", artistUserId)
+          .then(({ count }) => {
+            setFollowersCount(count || 0);
+          });
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [artistUserId]);
 
   const fetchArtistData = async () => {
@@ -309,16 +334,18 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage }: Art
         {tracks.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {tracks.map((track, index) => (
-              <motion.button
+              <motion.div
                 key={track.id}
-                onClick={() => onPlayTrack(track)}
                 className="group glass rounded-xl p-3 text-left border border-border/30 hover:border-primary/30 transition-all"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ y: -4 }}
               >
-                <div className="relative aspect-square rounded-lg overflow-hidden mb-3 bg-surface-elevated">
+                <div 
+                  className="relative aspect-square rounded-lg overflow-hidden mb-3 bg-surface-elevated cursor-pointer"
+                  onClick={() => onPlayTrack(track)}
+                >
                   {track.cover_url ? (
                     <img src={track.cover_url} alt={track.title} className="w-full h-full object-cover" />
                   ) : (
@@ -337,17 +364,30 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage }: Art
                   <Calendar className="w-3 h-3" />
                   {formatDate(track.created_at)}
                 </p>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Play className="w-3 h-3" />
-                    {track.play_count || 0}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Heart className="w-3 h-3" />
-                    {track.like_count || 0}
-                  </span>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Play className="w-3 h-3" />
+                      {track.play_count || 0}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Heart className="w-3 h-3" />
+                      {track.like_count || 0}
+                    </span>
+                  </div>
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToPlaylist?.(track);
+                    }}
+                    className="p-1.5 rounded-lg bg-surface-elevated/50 hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                    whileTap={{ scale: 0.9 }}
+                    title="Add to playlist"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </motion.button>
                 </div>
-              </motion.button>
+              </motion.div>
             ))}
           </div>
         ) : (

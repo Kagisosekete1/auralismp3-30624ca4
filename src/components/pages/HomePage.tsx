@@ -25,7 +25,7 @@ export interface HomePageProps {
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
   onViewProfile?: (userId: string) => void;
-  onAddToPlaylist?: (trackId: string) => void;
+  onAddToPlaylist?: (track: Track) => void;
 }
 
 const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist }: HomePageProps) => {
@@ -211,7 +211,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
                 <motion.button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToPlaylist?.(track.id);
+                    onAddToPlaylist?.(track);
                   }}
                   className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated text-xs text-muted-foreground hover:text-foreground transition-colors"
                   whileTap={{ scale: 0.95 }}
