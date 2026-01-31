@@ -10,7 +10,6 @@ import {
   Maximize2,
   Heart,
   ListMusic,
-  Mic2,
   Music2,
   Crown,
 } from "lucide-react";
@@ -310,13 +309,6 @@ const NowPlayingBar = ({
               <Heart className={`w-5 h-5 transition-colors ${isLiked ? "fill-accent text-accent" : "text-muted-foreground hover:text-foreground"}`} />
             </motion.button>
 
-            <motion.button 
-              className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Mic2 className="w-4 h-4" />
-            </motion.button>
             
             <motion.button 
               onClick={onShowQueue}

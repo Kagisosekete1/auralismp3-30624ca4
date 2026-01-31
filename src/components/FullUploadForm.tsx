@@ -147,10 +147,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    if (!profile?.is_artist) {
-      toast.error("Only registered artists can upload music. Update your profile to become an artist.");
-      return;
-    }
+    // Allow all signed-in users to upload (removed premium/artist restriction)
 
     if (!formData.ownsRights || !formData.termsAgreed) {
       toast.error("Please agree to all terms");
@@ -159,6 +156,16 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
     if (!audioFile) {
       toast.error("Please upload an audio file");
+      return;
+    }
+
+    if (!formData.title) {
+      toast.error("Please enter a release title");
+      return;
+    }
+
+    if (!formData.primaryGenre) {
+      toast.error("Please select a primary genre");
       return;
     }
 
