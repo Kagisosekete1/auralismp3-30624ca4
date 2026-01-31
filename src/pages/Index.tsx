@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useQueue } from "@/hooks/useQueue";
+import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -34,8 +35,19 @@ const Index = () => {
   const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
   const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
   const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
+  
+  // Use session persistence for navigation state
+  const {
+    activeSection,
+    selectedPlaylistId,
+    selectedArtistId,
+    sidebarOpen,
+    setActiveSection,
+    setSelectedPlaylistId,
+    setSelectedArtistId,
+    setSidebarOpen,
+  } = useSessionPersistence();
 
-  const [activeSection, setActiveSection] = useState("home");
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [showUploadMusic, setShowUploadMusic] = useState(false);
@@ -43,9 +55,6 @@ const Index = () => {
   const [showInbox, setShowInbox] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<{ id: string; title: string } | null>(null);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
-  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
