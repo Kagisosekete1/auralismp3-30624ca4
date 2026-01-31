@@ -9,6 +9,7 @@ import TopBar from "@/components/TopBar";
 import MobileNav from "@/components/MobileNav";
 import CreatePlaylistModal from "@/components/CreatePlaylistModal";
 import AddTrackModal from "@/components/AddTrackModal";
+import AddToPlaylistModal from "@/components/AddToPlaylistModal";
 import FullUploadForm from "@/components/FullUploadForm";
 import ArtistProfilePage from "@/components/pages/ArtistProfilePage";
 import InboxModal from "@/components/InboxModal";
@@ -40,6 +41,8 @@ const Index = () => {
   const [showUploadMusic, setShowUploadMusic] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+  const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<{ id: string; title: string } | null>(null);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -135,6 +138,11 @@ const Index = () => {
     setShowInbox(true);
   };
 
+  const handleAddToPlaylist = (track: any) => {
+    setSelectedTrackForPlaylist({ id: track.id, title: track.title || track.name });
+    setShowAddToPlaylist(true);
+  };
+
   const renderContent = () => {
     // Handle artist profile view
     if (activeSection === "artist-profile" && selectedArtistId) {
@@ -147,15 +155,16 @@ const Index = () => {
           }} 
           onPlayTrack={handlePlayTrack}
           onMessage={handleMessageArtist}
+          onAddToPlaylist={handleAddToPlaylist}
         />
       );
     }
 
     switch (activeSection) {
       case "home":
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={(trackId) => { setShowAddTrack(true); }} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} />;
       case "explore":
-        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} />;
       case "genre":
         return <GenrePage />;
       case "artists":
@@ -163,7 +172,7 @@ const Index = () => {
       case "library":
         return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} />;
       case "profile":
-        return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} />;
+        return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} />;
       case "settings":
         return <SettingsPage onSectionChange={handleSectionChange} />;
       case "notifications":
@@ -171,7 +180,7 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={(trackId) => { setShowAddTrack(true); }} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} />;
     }
   };
 
@@ -217,6 +226,15 @@ const Index = () => {
 
       <CreatePlaylistModal isOpen={showCreatePlaylist} onClose={() => setShowCreatePlaylist(false)} onCreate={handleCreatePlaylist} />
       <AddTrackModal isOpen={showAddTrack} onClose={() => setShowAddTrack(false)} onAdd={() => {}} playlistName="" />
+      <AddToPlaylistModal 
+        isOpen={showAddToPlaylist} 
+        onClose={() => {
+          setShowAddToPlaylist(false);
+          setSelectedTrackForPlaylist(null);
+        }} 
+        trackId={selectedTrackForPlaylist?.id || ""} 
+        trackTitle={selectedTrackForPlaylist?.title || ""} 
+      />
       <FullUploadForm isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} />
       <InboxModal isOpen={showInbox} onClose={() => setShowInbox(false)} />
       <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={(t) => playTrack({ id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl, coverUrl: t.coverUrl, duration: t.duration })} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
