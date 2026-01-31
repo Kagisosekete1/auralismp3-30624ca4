@@ -153,7 +153,7 @@ const Index = () => {
 
     switch (activeSection) {
       case "home":
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={(trackId) => { setShowAddTrack(true); }} />;
       case "explore":
         return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "genre":
@@ -161,7 +161,7 @@ const Index = () => {
       case "artists":
         return <ArtistsPage onViewArtist={handleViewArtist} />;
       case "library":
-        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} />;
+        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} />;
       case "profile":
         return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} />;
       case "settings":
@@ -171,7 +171,7 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={(trackId) => { setShowAddTrack(true); }} />;
     }
   };
 

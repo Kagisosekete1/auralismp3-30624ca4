@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Music2, TrendingUp, Clock, Plus, Play, Send } from "lucide-react";
+import { Music2, TrendingUp, Clock, Play, Send, ListPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import FeedPost from "../FeedPost";
+import EnhancedFeedPost from "../EnhancedFeedPost";
 import CreatePostModal from "../CreatePostModal";
 import type { Playlist } from "@/hooks/useAppState";
 
@@ -14,6 +14,7 @@ interface Track {
   audio_url: string;
   cover_url?: string;
   duration?: number;
+  play_count?: number;
 }
 
 export interface HomePageProps {
@@ -23,12 +24,16 @@ export interface HomePageProps {
   onUploadMusic: () => void;
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
+  onViewProfile?: (userId: string) => void;
+  onAddToPlaylist?: (trackId: string) => void;
 }
 
-const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack }: HomePageProps) => {
+const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist }: HomePageProps) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<any[]>([]);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [totalPlays, setTotalPlays] = useState(0);
+  const [totalListenTime, setTotalListenTime] = useState(0);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -39,15 +44,68 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+    fetchStats();
+
+    // Realtime subscription for posts
+    const postsChannel = supabase
+      .channel('home-posts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchPosts();
+      })
+      .subscribe();
+
+    // Realtime subscription for play stats
+    const playsChannel = supabase
+      .channel('home-plays-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'play_history' }, () => {
+        fetchStats();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(playsChannel);
+    };
+  }, [user]);
 
   const fetchPosts = async () => {
     const { data } = await supabase
       .from("posts")
-      .select(`*, tracks(id, title, artist_name, cover_url, audio_url), profiles(display_name, avatar_url)`)
+      .select(`*, tracks(id, title, artist_name, cover_url, audio_url, video_reel_url), profiles(display_name, avatar_url)`)
       .order("created_at", { ascending: false })
-      .limit(20);
-    if (data) setPosts(data.map(p => ({ ...p, track: p.tracks, profile: p.profiles })));
+      .limit(30);
+    
+    if (data) {
+      setPosts(data.map(p => ({ ...p, track: p.tracks, profile: p.profiles })));
+    }
+  };
+
+  const fetchStats = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch total plays on user's tracks (from other users)
+      const { data: userTracks } = await supabase
+        .from("tracks")
+        .select("id, play_count")
+        .eq("user_id", user.id);
+
+      if (userTracks) {
+        const plays = userTracks.reduce((sum, track) => sum + (track.play_count || 0), 0);
+        setTotalPlays(plays);
+      }
+
+      // Fetch listen time (from play_history)
+      const { count } = await supabase
+        .from("play_history")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      // Approximate 3 minutes per play
+      setTotalListenTime(Math.floor((count || 0) * 3 / 60));
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
   };
 
   const containerVariants = {
@@ -70,21 +128,21 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
         </motion.div>
       </div>
 
-      {/* Stats Bubbles */}
+      {/* Stats Bubbles - Realtime */}
       <section className="px-4 md:px-8 py-4">
         <div className="flex gap-3 overflow-x-auto pb-2">
-          <motion.button onClick={() => {}} className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap" whileHover={{ scale: 1.02 }}>
+          <motion.div className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap">
             <Music2 className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-foreground">{tracks.length} Total Tracks</span>
-          </motion.button>
-          <motion.button className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap" whileHover={{ scale: 1.02 }}>
+          </motion.div>
+          <motion.div className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap">
             <TrendingUp className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">0 Plays</span>
-          </motion.button>
-          <motion.button className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap" whileHover={{ scale: 1.02 }}>
+            <span className="text-sm font-medium text-foreground">{totalPlays.toLocaleString()} Plays</span>
+          </motion.div>
+          <motion.div className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap">
             <Clock className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">0h Listen Time</span>
-          </motion.button>
+            <span className="text-sm font-medium text-foreground">{totalListenTime}h Listen Time</span>
+          </motion.div>
         </div>
       </section>
 
@@ -97,7 +155,9 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
             whileHover={{ scale: 1.01 }}
           >
             <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">Y</span>
+              <span className="text-primary-foreground font-bold text-sm">
+                {(user.email?.[0] || "Y").toUpperCase()}
+              </span>
             </div>
             <span className="flex-1 text-muted-foreground">Share your thoughts or a new release...</span>
             <Send className="w-5 h-5 text-muted-foreground" />
@@ -105,13 +165,18 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
         </section>
       )}
 
-      {/* Feed */}
+      {/* Feed - Realtime */}
       <section className="px-4 md:px-8 py-4">
         <h2 className="text-xl font-display font-bold text-foreground mb-4">Feed</h2>
         {posts.length > 0 ? (
           <motion.div className="space-y-4" variants={containerVariants} initial="hidden" animate="visible">
             {posts.map(post => (
-              <FeedPost key={post.id} post={post} onPlayTrack={onPlayTrack} />
+              <EnhancedFeedPost 
+                key={post.id} 
+                post={post} 
+                onPlayTrack={onPlayTrack}
+                onViewProfile={onViewProfile}
+              />
             ))}
           </motion.div>
         ) : (
@@ -129,18 +194,32 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           <h2 className="text-xl md:text-2xl font-display font-bold text-foreground mb-4">Recently Uploaded</h2>
           <motion.div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" variants={containerVariants} initial="hidden" animate="visible">
             {tracks.slice(0, 12).map((track) => (
-              <motion.button key={track.id} onClick={() => onPlayTrack?.(track)} className="group glass rounded-xl p-3 text-left border border-border/30 hover:border-primary/30 transition-all" variants={itemVariants} whileHover={{ y: -8 }}>
-                <div className="relative w-full aspect-square rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 overflow-hidden">
-                  {track.cover_url ? <img src={track.cover_url} alt={track.title} className="w-full h-full object-cover" /> : <Music2 className="w-8 h-8 text-primary/60" />}
-                  <motion.div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                      <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground ml-0.5" />
-                    </div>
-                  </motion.div>
-                </div>
-                <h3 className="font-medium text-foreground text-sm truncate">{track.title}</h3>
-                <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
-              </motion.button>
+              <motion.div key={track.id} className="group glass rounded-xl p-3 border border-border/30 hover:border-primary/30 transition-all" variants={itemVariants} whileHover={{ y: -8 }}>
+                <button onClick={() => onPlayTrack?.(track)} className="w-full text-left">
+                  <div className="relative w-full aspect-square rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 overflow-hidden">
+                    {track.cover_url ? <img src={track.cover_url} alt={track.title} className="w-full h-full object-cover" /> : <Music2 className="w-8 h-8 text-primary/60" />}
+                    <motion.div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
+                        <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground ml-0.5" />
+                      </div>
+                    </motion.div>
+                  </div>
+                  <h3 className="font-medium text-foreground text-sm truncate">{track.title}</h3>
+                  <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
+                </button>
+                {/* Add to Playlist Button */}
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToPlaylist?.(track.id);
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <ListPlus className="w-3.5 h-3.5" />
+                  Add to Playlist
+                </motion.button>
+              </motion.div>
             ))}
           </motion.div>
         </section>
