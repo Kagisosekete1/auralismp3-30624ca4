@@ -1,9 +1,13 @@
 import { Bell, Settings, User, ChevronLeft, ChevronRight, Search, Upload } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SearchModal from "./SearchModal";
 import AuralisLogo from "./AuralisLogo";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useDatabase } from "@/hooks/useDatabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TopBarProps {
   onSearch?: (query: string) => void;
@@ -16,6 +20,42 @@ interface TopBarProps {
 const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack }: TopBarProps) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const isMobile = useIsMobile();
+  const { profile } = useDatabase();
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadCount = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("read", false);
+      
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnreadCount();
+
+    // Subscribe to notification changes
+    const channel = supabase
+      .channel("notification-count")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   return (
     <>
@@ -99,7 +139,11 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
             whileTap={{ scale: 0.95 }}
           >
             <Bell className="w-4 h-4 md:w-5 md:h-5" />
-            <span className="absolute top-1.5 right-1.5 md:top-2 md:right-2 w-2 h-2 rounded-full bg-accent" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center px-1">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </motion.button>
 
           <motion.button 
@@ -113,11 +157,16 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
 
           <motion.button 
             onClick={() => onSectionChange?.("profile")} 
-            className="w-9 h-9 md:w-10 md:h-10 rounded-xl gradient-secondary flex items-center justify-center text-secondary-foreground" 
+            className="w-9 h-9 md:w-10 md:h-10 rounded-xl overflow-hidden flex items-center justify-center ring-2 ring-primary/30 hover:ring-primary/60 transition-all" 
             whileHover={{ scale: 1.05 }} 
             whileTap={{ scale: 0.95 }}
           >
-            <User className="w-4 h-4 md:w-5 md:h-5" />
+            <Avatar className="w-full h-full">
+              <AvatarImage src={profile?.avatar_url || undefined} alt="Profile" />
+              <AvatarFallback className="gradient-secondary text-secondary-foreground">
+                <User className="w-4 h-4 md:w-5 md:h-5" />
+              </AvatarFallback>
+            </Avatar>
           </motion.button>
         </div>
       </header>

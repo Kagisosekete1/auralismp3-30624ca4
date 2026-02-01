@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Bell, Music2, Heart, User, Disc3, Check, Trash2, Settings } from "lucide-react";
+import { Bell, Music2, Heart, User, Check, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
@@ -13,138 +14,178 @@ interface Notification {
   read: boolean;
   created_at: string;
   data?: any;
+  related_id?: string;
 }
 
-const NotificationsPage = () => {
+interface NotificationsPageProps {
+  onSectionChange?: (section: string) => void;
+  onViewArtist?: (artistId: string) => void;
+  onPlayTrack?: (track: any) => void;
+}
+
+const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: NotificationsPageProps) => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState("All");
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const filters = ["All", "New Releases", "Follows", "Likes", "System"];
 
-  // Fetch latest tracks as "new release" notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user) return;
+  // Fetch notifications from database
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
 
-      // Fetch recent tracks from followed artists or all tracks as notifications
-      const { data: tracks } = await supabase
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Error fetching notifications:", error);
+      setLoading(false);
+      return;
+    }
+
+    setNotifications(data as Notification[] || []);
+    setLoading(false);
+  }, [user]);
+
+  // Generate notifications from activities if none exist
+  const generateNotifications = useCallback(async () => {
+    if (!user) return;
+
+    // Check if user has any notifications already
+    const { count } = await supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (count && count > 0) return;
+
+    // Fetch recent activities and create notifications
+    const [tracksRes, likesRes, followsRes] = await Promise.all([
+      supabase
         .from("tracks")
         .select("id, title, artist_name, created_at, cover_url")
         .neq("user_id", user.id)
+        .eq("is_approved", true)
         .order("created_at", { ascending: false })
-        .limit(10);
-
-      // Fetch likes on user's tracks
-      const { data: likes } = await supabase
+        .limit(5),
+      supabase
         .from("liked_tracks")
-        .select("id, track_id, created_at, tracks(title)")
-        .eq("tracks.user_id", user.id)
+        .select("id, track_id, created_at, tracks(title, user_id)")
         .order("created_at", { ascending: false })
-        .limit(5);
-
-      // Fetch new followers
-      const { data: follows } = await supabase
+        .limit(5),
+      supabase
         .from("follows")
-        .select("id, follower_id, created_at, profiles!follows_follower_id_fkey(display_name)")
+        .select("id, follower_id, created_at")
         .eq("following_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(5)
+    ]);
 
-      const notifs: Notification[] = [];
+    const notifs: any[] = [];
 
-      tracks?.forEach(track => {
+    tracksRes.data?.forEach(track => {
+      notifs.push({
+        user_id: user.id,
+        type: "new_release",
+        title: "New Release",
+        message: `${track.artist_name} released "${track.title}"`,
+        read: false,
+        related_id: track.id,
+        data: track,
+        created_at: track.created_at,
+      });
+    });
+
+    likesRes.data?.forEach((like: any) => {
+      if (like.tracks?.user_id === user.id) {
         notifs.push({
-          id: `release-${track.id}`,
-          type: "new_release",
-          title: "New Release",
-          message: `${track.artist_name} released "${track.title}"`,
+          user_id: user.id,
+          type: "like",
+          title: "New Like",
+          message: `Someone liked your track "${like.tracks.title}"`,
           read: false,
-          created_at: track.created_at,
-          data: track,
+          related_id: like.track_id,
+          created_at: like.created_at,
         });
+      }
+    });
+
+    followsRes.data?.forEach((follow: any) => {
+      notifs.push({
+        user_id: user.id,
+        type: "follow",
+        title: "New Follower",
+        message: "Someone started following you",
+        read: false,
+        related_id: follow.follower_id,
+        created_at: follow.created_at,
       });
+    });
 
-      likes?.forEach((like: any) => {
-        if (like.tracks) {
-          notifs.push({
-            id: `like-${like.id}`,
-            type: "like",
-            title: "New Like",
-            message: `Someone liked your track "${like.tracks.title}"`,
-            read: false,
-            created_at: like.created_at,
-          });
-        }
-      });
+    if (notifs.length > 0) {
+      await supabase.from("notifications").insert(notifs);
+      fetchNotifications();
+    }
+  }, [user, fetchNotifications]);
 
-      follows?.forEach((follow: any) => {
-        const name = follow.profiles?.display_name || "Someone";
-        notifs.push({
-          id: `follow-${follow.id}`,
-          type: "follow",
-          title: "New Follower",
-          message: `${name} started following you`,
-          read: false,
-          created_at: follow.created_at,
-        });
-      });
+  useEffect(() => {
+    if (!user) return;
 
-      // Sort by date
-      notifs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      // Remove duplicates
-      const uniqueNotifs = notifs.filter((notif, index, self) => 
-        index === self.findIndex(n => n.id === notif.id)
-      );
+    fetchNotifications().then(() => {
+      generateNotifications();
+    });
 
-      setNotifications(uniqueNotifs);
-    };
-
-    fetchNotifications();
-
-    // Set up realtime subscription for new tracks
+    // Set up realtime subscription
     const channel = supabase
-      .channel("notifications")
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => {
+          fetchNotifications();
+        }
+      )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "tracks" },
-        (payload) => {
+        async (payload) => {
           const track = payload.new as any;
-          if (track.user_id !== user?.id) {
-            setNotifications(prev => {
-              const newNotif: Notification = {
-                id: `release-${track.id}`,
-                type: "new_release",
-                title: "New Release",
-                message: `${track.artist_name} released "${track.title}"`,
-                read: false,
-                created_at: track.created_at,
-                data: track,
-              };
-              // Check for duplicates before adding
-              if (prev.some(n => n.id === newNotif.id)) return prev;
-              return [newNotif, ...prev];
+          if (track.user_id !== user.id && track.is_approved) {
+            await supabase.from("notifications").insert({
+              user_id: user.id,
+              type: "new_release",
+              title: "New Release",
+              message: `${track.artist_name} released "${track.title}"`,
+              related_id: track.id,
+              data: track,
             });
           }
         }
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "follows", filter: `following_id=eq.${user?.id}` },
-        (payload) => {
+        { event: "INSERT", schema: "public", table: "follows", filter: `following_id=eq.${user.id}` },
+        async (payload) => {
           const follow = payload.new as any;
-          setNotifications(prev => {
-            const newNotif: Notification = {
-              id: `follow-${follow.id}`,
-              type: "follow",
-              title: "New Follower",
-              message: "Someone started following you",
-              read: false,
-              created_at: follow.created_at,
-            };
-            if (prev.some(n => n.id === newNotif.id)) return prev;
-            return [newNotif, ...prev];
+          // Fetch follower profile
+          const { data: followerProfile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("user_id", follow.follower_id)
+            .single();
+
+          await supabase.from("notifications").insert({
+            user_id: user.id,
+            type: "follow",
+            title: "New Follower",
+            message: `${followerProfile?.display_name || "Someone"} started following you`,
+            related_id: follow.follower_id,
           });
         }
       )
@@ -153,7 +194,7 @@ const NotificationsPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchNotifications, generateNotifications]);
 
   const filteredNotifications = notifications.filter(notif => {
     if (activeFilter === "All") return true;
@@ -164,8 +205,60 @@ const NotificationsPage = () => {
     return true;
   });
 
-  const markAllRead = () => {
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAsRead = async (notifId: string) => {
+    await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", notifId);
+    
+    setNotifications(prev => 
+      prev.map(n => n.id === notifId ? { ...n, read: true } : n)
+    );
+  };
+
+  const markAllRead = async () => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", user.id)
+      .eq("read", false);
+
+    if (error) {
+      toast.error("Failed to mark notifications as read");
+      return;
+    }
+
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    toast.success("All notifications marked as read");
+  };
+
+  const handleNotificationClick = async (notif: Notification) => {
+    // Mark as read first
+    await markAsRead(notif.id);
+
+    // Navigate based on type
+    switch (notif.type) {
+      case "new_release":
+        if (notif.data) {
+          onPlayTrack?.(notif.data);
+        }
+        break;
+      case "follow":
+        if (notif.related_id) {
+          onViewArtist?.(notif.related_id);
+        }
+        break;
+      case "like":
+        onSectionChange?.("profile");
+        break;
+      case "system":
+        onSectionChange?.("settings");
+        break;
+    }
   };
 
   const getIcon = (type: string) => {
@@ -211,21 +304,31 @@ const NotificationsPage = () => {
           className="flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <Bell className="w-8 h-8 text-primary" />
+            <div className="relative">
+              <Bell className="w-8 h-8 text-primary" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-xs font-bold flex items-center justify-center text-accent-foreground">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </div>
             <div>
               <h1 className="text-3xl md:text-5xl font-display font-bold text-foreground">
                 Notifications
               </h1>
               <p className="text-muted-foreground text-base md:text-lg">
-                Stay updated with your music
+                {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
               </p>
             </div>
           </div>
           <motion.button
             onClick={markAllRead}
-            className="px-4 py-2 rounded-xl glass border-glow text-foreground font-medium text-sm flex items-center gap-2"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            disabled={unreadCount === 0}
+            className={`px-4 py-2 rounded-xl glass border-glow font-medium text-sm flex items-center gap-2 transition-opacity ${
+              unreadCount === 0 ? "opacity-50 cursor-not-allowed" : "text-foreground hover:bg-surface-elevated"
+            }`}
+            whileHover={unreadCount > 0 ? { scale: 1.02 } : {}}
+            whileTap={unreadCount > 0 ? { scale: 0.98 } : {}}
           >
             <Check className="w-4 h-4" />
             <span className="hidden sm:inline">Mark all read</span>
@@ -252,7 +355,21 @@ const NotificationsPage = () => {
         </div>
 
         {/* Notifications List */}
-        {filteredNotifications.length > 0 ? (
+        {loading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="glass rounded-xl p-4 border border-border/30 animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-surface-elevated" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-surface-elevated rounded w-1/3 mb-2" />
+                    <div className="h-3 bg-surface-elevated rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredNotifications.length > 0 ? (
           <motion.div
             className="space-y-3"
             variants={containerVariants}
@@ -264,11 +381,12 @@ const NotificationsPage = () => {
               return (
                 <motion.div
                   key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
                   className={`glass rounded-xl p-4 border transition-all cursor-pointer ${
                     notif.read ? 'border-border/30 opacity-70' : 'border-primary/30 bg-primary/5'
                   }`}
                   variants={itemVariants}
-                  whileHover={{ x: 4 }}
+                  whileHover={{ x: 4, backgroundColor: "hsl(var(--surface-elevated) / 0.3)" }}
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getColor(notif.type)} flex items-center justify-center flex-shrink-0`}>
@@ -280,7 +398,7 @@ const NotificationsPage = () => {
                           {notif.title}
                         </h3>
                         {!notif.read && (
-                          <span className="w-2 h-2 rounded-full bg-primary" />
+                          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                         )}
                       </div>
                       <p className="text-xs md:text-sm text-muted-foreground truncate">

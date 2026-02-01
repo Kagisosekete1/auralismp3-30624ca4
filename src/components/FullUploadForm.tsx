@@ -57,8 +57,16 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const isPremium = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'artist';
   const maxTracks = isPremium ? 50 : 4;
 
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  // Support multiple tracks for albums/EPs
+  interface TrackFile {
+    id: string;
+    file: File;
+    title: string;
+  }
+  
+  const [trackFiles, setTrackFiles] = useState<TrackFile[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [currentTrackTitle, setCurrentTrackTitle] = useState("");
 
   const defaultFormData = {
     // Release Details
@@ -194,9 +202,34 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
         toast.error("File size must be under 100MB");
         return;
       }
-      setAudioFile(file);
-      toast.success(`Audio file "${file.name}" selected`);
+      
+      // For singles, just add the single track
+      if (formData.releaseType === "single") {
+        setTrackFiles([{ id: Date.now().toString(), file, title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") }]);
+      } else {
+        // For albums/EPs, check track limit
+        if (trackFiles.length >= maxTracks) {
+          toast.error(`Maximum ${maxTracks} tracks allowed. Upgrade to Pro for more.`);
+          return;
+        }
+        setTrackFiles(prev => [...prev, { 
+          id: Date.now().toString(), 
+          file, 
+          title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") 
+        }]);
+        setCurrentTrackTitle("");
+      }
+      toast.success(`Track "${file.name}" added`);
     }
+  };
+
+  const removeTrack = (trackId: string) => {
+    setTrackFiles(prev => prev.filter(t => t.id !== trackId));
+    toast.success("Track removed");
+  };
+
+  const updateTrackTitle = (trackId: string, title: string) => {
+    setTrackFiles(prev => prev.map(t => t.id === trackId ? { ...t, title } : t));
   };
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,15 +254,13 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    // Allow all signed-in users to upload (removed premium/artist restriction)
-
     if (!formData.ownsRights || !formData.termsAgreed) {
       toast.error("Please agree to all terms");
       return;
     }
 
-    if (!audioFile) {
-      toast.error("Please upload an audio file");
+    if (trackFiles.length === 0) {
+      toast.error("Please upload at least one audio file");
       return;
     }
 
@@ -243,35 +274,41 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    if (!formData.title) {
-      toast.error("Please enter a release title");
+    // Validate track count for release type
+    if (formData.releaseType === "single" && trackFiles.length > 1) {
+      toast.error("Singles can only have 1 track");
       return;
     }
 
-    if (!formData.primaryGenre) {
-      toast.error("Please select a primary genre");
+    if (formData.releaseType === "ep" && (trackFiles.length < 2 || trackFiles.length > 6)) {
+      toast.error("EPs should have 2-6 tracks");
+      return;
+    }
+
+    if (formData.releaseType === "album" && trackFiles.length < 3) {
+      toast.error("Albums should have at least 3 tracks");
       return;
     }
 
     setIsUploading(true);
 
     try {
-      // For album/EP, we'd create an album first - for single, just upload track
-      const result = await uploadTrack(audioFile, coverFile, {
-        title: formData.title,
-        artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
-        genre: formData.primaryGenre,
-        isExplicit: formData.isExplicit,
-        version: formData.version.toLowerCase(),
-        moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
-      });
-
-      if (result) {
-        toast.success("Release submitted successfully! 🎉 It will be reviewed shortly.");
-        onSuccess?.();
-        resetForm();
-        onClose();
+      // Upload each track
+      for (const track of trackFiles) {
+        await uploadTrack(track.file, coverFile, {
+          title: trackFiles.length === 1 ? formData.title : track.title,
+          artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
+          genre: formData.primaryGenre,
+          isExplicit: formData.isExplicit,
+          version: formData.version.toLowerCase(),
+          moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
+        });
       }
+
+      toast.success(`${formData.releaseType === "single" ? "Track" : formData.releaseType.toUpperCase()} submitted successfully! 🎉`);
+      onSuccess?.();
+      resetForm();
+      onClose();
     } catch (error) {
       toast.error("Upload failed. Please try again.");
     } finally {
@@ -281,8 +318,9 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   const resetForm = () => {
     setStep(1);
-    setAudioFile(null);
+    setTrackFiles([]);
     setCoverFile(null);
+    setCurrentTrackTitle("");
     setFormData({
       language: "English",
       title: "",
@@ -633,33 +671,101 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
             {/* Step 5: Upload Files */}
             {step === 5 && (
               <>
-                <div className="flex items-center gap-2 mb-4">
-                  <Upload className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-display font-bold text-foreground">Track Upload</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-primary" />
+                    <h3 className="text-lg font-display font-bold text-foreground">
+                      {formData.releaseType === "single" ? "Track Upload" : `${formData.releaseType.toUpperCase()} Tracks`}
+                    </h3>
+                  </div>
+                  {formData.releaseType !== "single" && (
+                    <span className="text-sm text-muted-foreground">
+                      {trackFiles.length}/{maxTracks} tracks
+                    </span>
+                  )}
                 </div>
+                
+                {/* Track Title Input for albums/EPs */}
+                {formData.releaseType !== "single" && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-foreground mb-2">Track Title</label>
+                    <input 
+                      className={inputClass} 
+                      placeholder="Enter track title before adding" 
+                      value={currentTrackTitle} 
+                      onChange={e => setCurrentTrackTitle(e.target.value)} 
+                    />
+                  </div>
+                )}
                 
                 <div className="space-y-4">
                   <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,audio/*" onChange={handleAudioSelect} className="hidden" />
+                  
+                  {/* Add Track Button */}
                   <div 
                     onClick={() => audioInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${trackFiles.length > 0 ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                   >
-                    {audioFile ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <FileAudio className="w-12 h-12 text-primary" />
-                        <div className="text-left">
-                          <p className="font-medium text-foreground">{audioFile.name}</p>
-                          <p className="text-sm text-muted-foreground">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                        </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Plus className="w-6 h-6 text-primary" />
                       </div>
-                    ) : (
-                      <>
-                        <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="font-medium text-foreground mb-1">Upload Audio File *</p>
-                        <p className="text-sm text-muted-foreground">High-quality MP3 (320kbps), WAV, FLAC, AIFF • Max 100MB</p>
-                      </>
-                    )}
+                      <div className="text-left">
+                        <p className="font-medium text-foreground">
+                          {formData.releaseType === "single" 
+                            ? (trackFiles.length > 0 ? "Replace Track" : "Add Audio File *")
+                            : "Add Track to Album"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">MP3, WAV, FLAC, AIFF • Max 100MB per file</p>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Track List */}
+                  {trackFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-foreground">Tracks ({trackFiles.length})</h4>
+                      {trackFiles.map((track, index) => (
+                        <div key={track.id} className="flex items-center gap-3 glass rounded-xl p-3 border border-border/30">
+                          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                            {index + 1}
+                          </div>
+                          <FileAudio className="w-5 h-5 text-primary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            {formData.releaseType !== "single" ? (
+                              <input
+                                className="w-full bg-transparent border-b border-transparent hover:border-border focus:border-primary outline-none text-foreground text-sm"
+                                value={track.title}
+                                onChange={e => updateTrackTitle(track.id, e.target.value)}
+                                placeholder="Track title"
+                              />
+                            ) : (
+                              <p className="font-medium text-foreground text-sm truncate">{track.title}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground truncate">{track.file.name} • {(track.file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                          <button 
+                            onClick={() => removeTrack(track.id)}
+                            className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Track count guidance */}
+                  {formData.releaseType !== "single" && (
+                    <div className="glass rounded-xl p-4 border border-border/30 bg-surface-elevated/30">
+                      <p className="text-sm text-muted-foreground">
+                        {formData.releaseType === "ep" 
+                          ? "EPs typically have 2-6 tracks" 
+                          : "Albums should have at least 3 tracks"}
+                        {!isPremium && ` (Free tier: max ${maxTracks} tracks)`}
+                      </p>
+                    </div>
+                  )}
 
                   <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
                   <div 
