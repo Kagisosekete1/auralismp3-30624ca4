@@ -356,21 +356,6 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
         </div>
       </section>
 
-      {/* Danger Zone */}
-      <section className="px-4 md:px-8 py-6">
-        <h2 className="text-xl font-display font-bold text-destructive mb-4">Danger Zone</h2>
-        <motion.button
-          onClick={handleDeleteProfile}
-          className="w-full glass rounded-xl p-4 border border-destructive/30 hover:border-destructive/50 transition-colors flex items-center gap-4 text-destructive"
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center">
-            <Trash2 className="w-5 h-5" />
-          </div>
-          <span className="font-medium">Delete Account</span>
-        </motion.button>
-      </section>
     </div>
   );
 };

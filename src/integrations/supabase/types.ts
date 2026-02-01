@@ -201,6 +201,42 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          message: string
+          read: boolean
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message: string
+          read?: boolean
+          related_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message?: string
+          read?: boolean
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       play_history: {
         Row: {
           id: string
@@ -423,6 +459,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           country: string | null
+          cover_photo_url: string | null
           created_at: string
           display_name: string | null
           followers_count: number | null
@@ -443,6 +480,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           display_name?: string | null
           followers_count?: number | null
@@ -463,6 +501,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           display_name?: string | null
           followers_count?: number | null

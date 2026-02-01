@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown, Shield, FileText, ExternalLink } from "lucide-react";
+import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown, Shield, FileText, Trash2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,10 +16,23 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
   const [darkMode, setDarkMode] = useState(true);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
     toast.success("Logged out successfully");
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm("Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.");
+    if (!confirmed) return;
+
+    try {
+      await signOut();
+      toast.success("Account deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete account");
+    }
   };
 
   const toggleTheme = () => {
@@ -202,15 +215,39 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
         {/* Logout */}
         <motion.button
           onClick={handleLogout}
-          className="w-full glass rounded-2xl p-4 md:p-5 border border-destructive/30 hover:border-destructive/50 transition-colors flex items-center gap-4 text-destructive"
+          className="w-full glass rounded-2xl p-4 md:p-5 border border-border/30 hover:border-primary/30 transition-colors flex items-center gap-4 text-foreground"
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
         >
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-destructive/20 flex items-center justify-center">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-elevated/50 flex items-center justify-center">
             <LogOut className="w-5 h-5 md:w-6 md:h-6" />
           </div>
           <span className="font-medium text-sm md:text-base">Log Out</span>
         </motion.button>
+
+        {/* Danger Zone */}
+        <motion.section variants={containerVariants} initial="hidden" animate="visible">
+          <h2 className="text-lg md:text-xl font-display font-bold text-destructive mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Danger Zone
+          </h2>
+          <div className="glass rounded-2xl border border-destructive/30 overflow-hidden">
+            <motion.button
+              onClick={handleDeleteAccount}
+              className="w-full flex items-center gap-4 p-4 md:p-5 hover:bg-destructive/10 transition-colors text-left text-destructive"
+              whileHover={{ x: 4 }}
+            >
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm md:text-base">Delete Account</h3>
+                <p className="text-xs md:text-sm text-destructive/70">Permanently delete your account and all data</p>
+              </div>
+              <ChevronRight className="w-5 h-5" />
+            </motion.button>
+          </div>
+        </motion.section>
       </div>
     </div>
   );
