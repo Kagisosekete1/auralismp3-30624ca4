@@ -55,7 +55,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isPremium = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'artist';
-  const maxTracks = isPremium ? 50 : 4;
+  const maxTracks = 20; // Maximum 20 tracks for all users
 
   // Support multiple tracks for albums/EPs
   interface TrackFile {
