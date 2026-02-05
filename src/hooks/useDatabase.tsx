@@ -45,6 +45,7 @@ export interface DbProfile {
   artist_name?: string;
   bio?: string;
   avatar_url?: string;
+  cover_photo_url?: string;
   country?: string;
   instagram?: string;
   tiktok?: string;

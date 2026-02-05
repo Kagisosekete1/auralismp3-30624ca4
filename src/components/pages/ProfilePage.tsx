@@ -32,8 +32,10 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const [editData, setEditData] = useState({
     display_name: profile?.display_name || "",
@@ -109,6 +111,31 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
     }
   };
 
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploadingCover(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/cover_${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      await updateProfile({ cover_photo_url: data.publicUrl });
+      toast.success("Cover photo updated!");
+    } catch (error) {
+      toast.error("Failed to upload cover photo");
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   const handleDeleteTrack = async (trackId: string) => {
     const confirmed = window.confirm("Are you sure you want to delete this release?");
     if (!confirmed) return;
@@ -143,9 +170,44 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
 
   return (
     <div className="flex-1 overflow-y-auto pb-32">
-      {/* Profile Header */}
-      <div className="gradient-hero pt-6 md:pt-8 pb-8 md:pb-12 px-4 md:px-8">
-        <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
+      {/* Cover Photo Header */}
+      <div className="relative">
+        <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+        
+        {/* Cover Photo Banner */}
+        <div className="relative h-40 md:h-56 w-full overflow-hidden">
+          {profile?.cover_photo_url ? (
+            <img 
+              src={profile.cover_photo_url} 
+              alt="Cover" 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full gradient-hero" />
+          )}
+          {/* Gradient overlay for blending */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+          
+          {/* Cover photo upload button */}
+          <motion.button
+            onClick={() => coverInputRef.current?.click()}
+            disabled={isUploadingCover}
+            className="absolute top-4 right-4 px-3 py-2 rounded-lg glass border border-border/30 flex items-center gap-2 text-foreground text-sm hover:bg-surface-elevated/80 transition-colors"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {isUploadingCover ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ImageIcon className="w-4 h-4" />
+            )}
+            {isUploadingCover ? "Uploading..." : "Edit Cover"}
+          </motion.button>
+        </div>
+
+        {/* Profile content overlapping cover */}
+        <div className="relative px-4 md:px-8 -mt-16 md:-mt-24">
+          <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
           {/* Avatar */}
           <motion.div
             className="relative"
@@ -251,9 +313,9 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
               </motion.button>
             )}
           </div>
+          </div>
         </div>
       </div>
-
       {/* Stats */}
       <section className="px-4 md:px-8 py-6">
         <motion.div

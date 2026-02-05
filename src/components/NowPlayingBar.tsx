@@ -133,10 +133,8 @@ const NowPlayingBar = ({
         <>
           {/* Left - Current Track */}
           <div className="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] min-w-0">
-            <motion.div
+            <div
               className="relative flex-shrink-0 cursor-pointer"
-              animate={{ rotate: currentTrack.videoReelUrl ? 0 : (isPlaying ? 360 : 0) }}
-              transition={{ duration: 3, repeat: isPlaying && !currentTrack.videoReelUrl ? Infinity : 0, ease: "linear" }}
               onClick={onTrackClick}
             >
               {currentTrack.videoReelUrl ? (
@@ -157,12 +155,10 @@ const NowPlayingBar = ({
                   <Music2 className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
                 </div>
               )}
-              <motion.div 
-                className="absolute inset-0 rounded-xl border-2 border-primary/50"
-                animate={{ opacity: isPlaying ? [0.5, 1, 0.5] : 0 }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-            </motion.div>
+              {isPlaying && (
+                <div className="absolute inset-0 rounded-xl border-2 border-primary/50 animate-pulse" />
+              )}
+            </div>
             
             <div className="min-w-0 flex-1" onClick={onTrackClick}>
               <motion.p 
