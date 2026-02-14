@@ -230,7 +230,7 @@ const Index = () => {
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />
-          <div className="flex-1 overflow-y-auto pb-36 md:pb-24">{renderContent()}</div>
+          <div className="flex-1 overflow-y-auto pb-40 md:pb-28">{renderContent()}</div>
         </div>
       </div>
 

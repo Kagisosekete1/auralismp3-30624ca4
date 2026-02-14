@@ -102,7 +102,7 @@ const NowPlayingBar = ({
 
   // Always show player - permanent design
   return (
-    <footer className="fixed bottom-16 md:bottom-0 left-0 right-0 h-20 md:h-24 glass-strong border-t border-border/30 px-4 md:px-6 flex items-center justify-between z-40">
+    <footer className="fixed bottom-[64px] md:bottom-0 left-0 right-0 h-[72px] md:h-24 glass-strong border-t border-border/30 px-3 md:px-6 flex items-center justify-between z-40">
       {!currentTrack ? (
         // Empty state - still shows player frame
         <div className="flex items-center justify-center w-full gap-4">
