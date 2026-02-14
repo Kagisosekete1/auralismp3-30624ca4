@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Music2, TrendingUp, Clock, Play, Send, ListPlus } from "lucide-react";
+import { Music2, TrendingUp, Clock, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import EnhancedFeedPost from "../EnhancedFeedPost";
 import CreatePostModal from "../CreatePostModal";
+import TrackCard from "../TrackCard";
 import type { Playlist } from "@/hooks/useAppState";
 
 interface Track {
@@ -15,6 +16,7 @@ interface Track {
   cover_url?: string;
   duration?: number;
   play_count?: number;
+  genre?: string;
 }
 
 export interface HomePageProps {
@@ -34,6 +36,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [totalPlays, setTotalPlays] = useState(0);
   const [totalListenTime, setTotalListenTime] = useState(0);
+  const [liveTracks, setLiveTracks] = useState<Track[]>(tracks);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -41,6 +44,11 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   };
+
+  // Keep liveTracks in sync with prop changes
+  useEffect(() => {
+    setLiveTracks(tracks);
+  }, [tracks]);
 
   useEffect(() => {
     fetchPosts();
@@ -62,9 +70,19 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       })
       .subscribe();
 
+    // Realtime subscription for track play_count updates
+    const tracksChannel = supabase
+      .channel('home-tracks-realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tracks' }, (payload) => {
+        const updated = payload.new as any;
+        setLiveTracks(prev => prev.map(t => t.id === updated.id ? { ...t, play_count: updated.play_count } : t));
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(playsChannel);
+      supabase.removeChannel(tracksChannel);
     };
   }, [user]);
 
@@ -84,7 +102,6 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
     if (!user) return;
 
     try {
-      // Fetch total plays on user's tracks (from other users)
       const { data: userTracks } = await supabase
         .from("tracks")
         .select("id, play_count")
@@ -95,13 +112,11 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
         setTotalPlays(plays);
       }
 
-      // Fetch listen time (from play_history)
       const { count } = await supabase
         .from("play_history")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      // Approximate 3 minutes per play
       setTotalListenTime(Math.floor((count || 0) * 3 / 60));
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -110,12 +125,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+    visible: { opacity: 1, transition: { staggerChildren: 0.06 } }
   };
 
   return (
@@ -133,7 +143,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
         <div className="flex gap-3 overflow-x-auto pb-2">
           <motion.div className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap">
             <Music2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">{tracks.length} Total Tracks</span>
+            <span className="text-sm font-medium text-foreground">{liveTracks.length} Total Tracks</span>
           </motion.div>
           <motion.div className="flex items-center gap-2 px-4 py-2.5 rounded-full glass border border-border/30 whitespace-nowrap">
             <TrendingUp className="w-4 h-4 text-primary" />
@@ -189,43 +199,18 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       </section>
 
       {/* Recently Uploaded */}
-      {tracks.length > 0 && (
+      {liveTracks.length > 0 && (
         <section className="px-4 md:px-8 py-6">
           <h2 className="text-xl md:text-2xl font-display font-bold text-foreground mb-4">Recently Uploaded</h2>
           <motion.div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" variants={containerVariants} initial="hidden" animate="visible">
-            {tracks.slice(0, 12).map((track) => (
-              <motion.div key={track.id} className="group glass rounded-xl p-3 border border-border/30 hover:border-primary/30 transition-all" variants={itemVariants} whileHover={{ y: -8 }}>
-                <button onClick={() => onPlayTrack?.(track)} className="w-full text-left">
-                  <div className="relative w-full aspect-square rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 overflow-hidden">
-                    {track.cover_url ? <img src={track.cover_url} alt={track.title} className="w-full h-full object-cover" /> : <Music2 className="w-8 h-8 text-primary/60" />}
-                    <motion.div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                        <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground ml-0.5" />
-                      </div>
-                    </motion.div>
-                  </div>
-                  <h3 className="font-medium text-foreground text-sm truncate">{track.title}</h3>
-                  <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
-                </button>
-                {/* Add to Playlist Button */}
-                <motion.button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddToPlaylist?.(track);
-                  }}
-                  className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-elevated/50 hover:bg-surface-elevated text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <ListPlus className="w-3.5 h-3.5" />
-                  Add to Playlist
-                </motion.button>
-              </motion.div>
+            {liveTracks.slice(0, 12).map((track) => (
+              <TrackCard key={track.id} track={track} onPlay={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
             ))}
           </motion.div>
         </section>
       )}
 
-      <CreatePostModal isOpen={showCreatePost} onClose={() => setShowCreatePost(false)} tracks={tracks} onSuccess={fetchPosts} />
+      <CreatePostModal isOpen={showCreatePost} onClose={() => setShowCreatePost(false)} tracks={liveTracks} onSuccess={fetchPosts} />
     </div>
   );
 };
