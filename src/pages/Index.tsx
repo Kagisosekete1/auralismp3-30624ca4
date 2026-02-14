@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import NowPlayingBar from "@/components/NowPlayingBar";
@@ -95,7 +96,7 @@ const Index = () => {
     setSelectedPlaylistId(id);
   };
 
-  const handlePlayTrack = (track: any) => {
+  const handlePlayTrack = async (track: any) => {
     const audioTrack = {
       id: track.id,
       title: track.title || track.name,
@@ -107,6 +108,32 @@ const Index = () => {
     };
     playTrack(audioTrack);
     addToQueue(audioTrack);
+
+    // Increment play count in database
+    try {
+      const { data: currentTrackData } = await supabase
+        .from("tracks")
+        .select("play_count")
+        .eq("id", track.id)
+        .single();
+
+      if (currentTrackData) {
+        await supabase
+          .from("tracks")
+          .update({ play_count: (currentTrackData.play_count || 0) + 1 })
+          .eq("id", track.id);
+      }
+
+      // Record play history
+      if (user) {
+        await supabase.from("play_history").insert({
+          user_id: user.id,
+          track_id: track.id,
+        });
+      }
+    } catch (error) {
+      console.error("Error recording play:", error);
+    }
   };
 
   const handleToggleLikeCurrentTrack = () => {
