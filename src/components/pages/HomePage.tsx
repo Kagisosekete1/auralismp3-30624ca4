@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Music2, TrendingUp, Clock, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDatabase } from "@/hooks/useDatabase";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import EnhancedFeedPost from "../EnhancedFeedPost";
 import CreatePostModal from "../CreatePostModal";
 import TrackCard from "../TrackCard";
@@ -32,6 +34,7 @@ export interface HomePageProps {
 
 const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist }: HomePageProps) => {
   const { user } = useAuth();
+  const { profile } = useDatabase();
   const [posts, setPosts] = useState<any[]>([]);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [totalPlays, setTotalPlays] = useState(0);
@@ -158,19 +161,20 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
 
       {/* Create Post Bar */}
       {user && (
-        <section className="px-4 md:px-8 py-4">
+        <section className="px-4 md:px-8 py-3">
           <motion.button
             onClick={() => setShowCreatePost(true)}
-            className="w-full flex items-center gap-3 p-4 rounded-2xl glass border border-border/30 hover:border-primary/30 transition-colors text-left"
+            className="w-full flex items-center gap-3 p-3 md:p-4 rounded-2xl glass border border-border/30 hover:border-primary/30 transition-colors text-left"
             whileHover={{ scale: 1.01 }}
           >
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">
+            <Avatar className="w-9 h-9 md:w-10 md:h-10 ring-2 ring-primary/20">
+              <AvatarImage src={profile?.avatar_url || undefined} alt="You" />
+              <AvatarFallback className="gradient-primary text-primary-foreground text-xs font-bold">
                 {(user.email?.[0] || "Y").toUpperCase()}
-              </span>
-            </div>
-            <span className="flex-1 text-muted-foreground">Share your thoughts or a new release...</span>
-            <Send className="w-5 h-5 text-muted-foreground" />
+              </AvatarFallback>
+            </Avatar>
+            <span className="flex-1 text-muted-foreground text-sm">Share your thoughts or a new release...</span>
+            <Send className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
           </motion.button>
         </section>
       )}
