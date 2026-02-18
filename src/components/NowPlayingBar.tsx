@@ -1,21 +1,6 @@
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Shuffle,
-  Repeat,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  Heart,
-  ListMusic,
-  Music2,
-  Crown,
-} from "lucide-react";
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import AuralisLogo from "./AuralisLogo";
+import { Play, Pause, SkipForward, Heart, Music2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { motion, AnimatePresence, useMotionValue, PanInfo } from "framer-motion";
 import VideoReelPlayer from "./VideoReelPlayer";
 
 interface NowPlayingTrack {
@@ -52,310 +37,181 @@ interface NowPlayingBarProps {
   isPremium?: boolean;
 }
 
-const NowPlayingBar = ({ 
-  currentTrack, 
-  isPlaying, 
+const MarqueeText = ({ text, className }: { text: string; className?: string }) => {
+  const shouldScroll = text.length > 22;
+  return (
+    <div className="overflow-hidden relative max-w-full">
+      <motion.p
+        className={`whitespace-nowrap ${className}`}
+        animate={shouldScroll ? { x: ["0%", "-50%"] } : { x: 0 }}
+        transition={shouldScroll ? {
+          x: { repeat: Infinity, repeatType: "loop", duration: 7, ease: "linear", repeatDelay: 1.5 },
+        } : {}}
+      >
+        {shouldScroll ? `${text}   •   ${text}` : text}
+      </motion.p>
+    </div>
+  );
+};
+
+const NowPlayingBar = ({
+  currentTrack,
+  isPlaying,
   onTogglePlay,
   isLiked,
   onToggleLike,
   progress = 0,
   duration = 0,
   onSeek,
-  volume = 70,
-  onVolumeChange,
-  isMuted = false,
-  onToggleMute,
-  formatTime,
   onNext,
   onPrevious,
-  onShuffle,
-  onRepeat,
-  isShuffled = false,
-  repeatMode = "off",
-  onShowQueue,
   onTrackClick,
   isPremium = false,
 }: NowPlayingBarProps) => {
-  const [localVolume, setLocalVolume] = useState(volume);
-  const [localMuted, setLocalMuted] = useState(isMuted);
+  const dragX = useMotionValue(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleVolumeChange = (val: number) => {
-    setLocalVolume(val);
-    setLocalMuted(false);
-    onVolumeChange?.(val);
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    setIsDragging(false);
+    const { x } = info.offset;
+    const { x: vx } = info.velocity;
+
+    if (x < -60 || vx < -300) {
+      onNext?.();
+    } else if (x > 60 || vx > 300) {
+      onPrevious?.();
+    }
+    dragX.set(0);
   };
 
-  const handleMuteToggle = () => {
-    setLocalMuted(!localMuted);
-    onToggleMute?.();
-  };
-
-  const currentTime = duration ? (progress / 100) * duration : 0;
-
-  const defaultFormatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const timeFormatter = formatTime || defaultFormatTime;
-
-  // Always show player - permanent design
+  // Always show player
   return (
-    <footer className="fixed bottom-[64px] md:bottom-0 left-0 right-0 h-[72px] md:h-24 glass-strong border-t border-border/30 px-3 md:px-6 flex items-center justify-between z-40">
-      {!currentTrack ? (
-        // Empty state - still shows player frame
-        <div className="flex items-center justify-center w-full gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-elevated/50 flex items-center justify-center">
-              <AuralisLogo size={28} />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-foreground">Auralis Player</p>
-              <p className="text-xs text-muted-foreground">Select a track to start playing</p>
-            </div>
-          </div>
-          
-          {/* Disabled controls */}
-          <div className="flex items-center gap-3">
-            <button disabled className="text-muted-foreground/50 cursor-not-allowed">
-              <SkipBack className="w-4 h-4 fill-current" />
-            </button>
-            <button disabled className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-elevated/50 flex items-center justify-center cursor-not-allowed">
-              <Play className="w-4 h-4 text-muted-foreground/50 ml-0.5" />
-            </button>
-            <button disabled className="text-muted-foreground/50 cursor-not-allowed">
-              <SkipForward className="w-4 h-4 fill-current" />
-            </button>
-          </div>
+    <footer className="fixed bottom-[64px] md:bottom-0 left-0 right-0 z-40">
+      {/* Progress bar strip at top */}
+      {currentTrack && (
+        <div className="relative h-0.5 bg-border/30 w-full">
+          <motion.div
+            className="h-full gradient-primary"
+            style={{ width: `${progress}%` }}
+            transition={{ duration: 0.1 }}
+          />
+          <input
+            type="range" min="0" max="100" value={progress}
+            onChange={(e) => onSeek?.(Number(e.target.value))}
+            className="absolute inset-0 w-full opacity-0 cursor-pointer h-full"
+          />
         </div>
-      ) : (
-        <>
-          {/* Left - Current Track */}
-          <div className="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] min-w-0">
-            <div
-              className="relative flex-shrink-0 cursor-pointer"
-              onClick={onTrackClick}
+      )}
+
+      <div className="glass-strong border-t border-border/30 h-[68px] px-3 flex items-center gap-3">
+        {!currentTrack ? (
+          /* Empty state */
+          <div className="flex items-center gap-3 w-full">
+            <div className="w-11 h-11 rounded-xl bg-surface-elevated/60 flex items-center justify-center flex-shrink-0">
+              <Music2 className="w-5 h-5 text-muted-foreground/50" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Auralis</p>
+              <p className="text-xs text-muted-foreground">Select a track to play</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-surface-elevated/40 flex items-center justify-center">
+              <Play className="w-4 h-4 text-muted-foreground/50 ml-0.5" />
+            </div>
+          </div>
+        ) : (
+          /* Track playing — swipeable area */
+          <motion.div
+            className="flex items-center gap-3 w-full cursor-grab active:cursor-grabbing select-none"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.4}
+            style={{ x: dragX }}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={handleDragEnd}
+          >
+            {/* Cover art — click opens full screen player */}
+            <motion.div
+              className="flex-shrink-0 relative"
+              onClick={(e) => { if (!isDragging) { e.stopPropagation(); onTrackClick?.(); } }}
+              whileTap={{ scale: 0.95 }}
             >
               {currentTrack.videoReelUrl ? (
                 <VideoReelPlayer
                   videoUrl={currentTrack.videoReelUrl}
                   isPlaying={isPlaying}
                   coverUrl={currentTrack.coverUrl}
-                  className="w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg"
+                  className="w-11 h-11 rounded-xl shadow-lg"
                 />
               ) : currentTrack.coverUrl ? (
-                <img 
-                  src={currentTrack.coverUrl} 
+                <img
+                  src={currentTrack.coverUrl}
                   alt={currentTrack.title}
-                  className="w-12 h-12 md:w-16 md:h-16 rounded-xl object-cover shadow-lg"
+                  className="w-11 h-11 rounded-xl object-cover shadow-lg"
+                  draggable={false}
                 />
               ) : (
-                <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-surface-elevated flex items-center justify-center shadow-lg">
-                  <Music2 className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground" />
+                <div className="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center shadow-lg">
+                  <Music2 className="w-5 h-5 text-muted-foreground" />
                 </div>
               )}
               {isPlaying && (
-                <div className="absolute inset-0 rounded-xl border-2 border-primary/50 animate-pulse" />
+                <div className="absolute inset-0 rounded-xl border-2 border-primary/40 animate-pulse pointer-events-none" />
               )}
-            </div>
-            
-            <div className="min-w-0 flex-1" onClick={onTrackClick}>
-              <motion.p 
-                className="font-semibold text-foreground truncate hover:text-primary cursor-pointer transition-colors text-sm md:text-base"
-                whileHover={{ x: 2 }}
-              >
-                {currentTrack.title}
-              </motion.p>
-              <motion.p 
-                className="text-xs md:text-sm text-muted-foreground truncate hover:text-foreground cursor-pointer transition-colors"
-                whileHover={{ x: 2 }}
-              >
-                {currentTrack.artist}
-              </motion.p>
-            </div>
-            
-            <motion.button
-              onClick={onToggleLike}
-              className="flex-shrink-0 hidden sm:block"
-              whileTap={{ scale: 0.9 }}
-            >
-              <Heart className={`w-5 h-5 transition-colors ${isLiked ? "fill-accent text-accent" : "text-muted-foreground hover:text-foreground"}`} />
-            </motion.button>
-          </div>
+            </motion.div>
 
-          {/* Center - Player Controls */}
-          <div className="flex flex-col items-center max-w-[30%] md:max-w-[40%] w-full">
-            <div className="flex items-center gap-3 md:gap-5 mb-2 md:mb-3">
+            {/* Track info marquee */}
+            <div
+              className="flex-1 min-w-0 overflow-hidden"
+              onClick={() => { if (!isDragging) onTrackClick?.(); }}
+            >
+              <MarqueeText text={currentTrack.title} className="text-sm font-semibold text-foreground" />
+              <MarqueeText text={currentTrack.artist} className="text-xs text-muted-foreground mt-0.5" />
+            </div>
+
+            {/* Action buttons — stop drag propagation */}
+            <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              {/* Like */}
               <motion.button
-                onClick={onShuffle}
-                className={`hidden md:block transition-colors ${isShuffled ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                onClick={onToggleLike}
+                whileTap={{ scale: 0.85 }}
+                className="p-1.5"
               >
-                <Shuffle className="w-4 h-4" />
+                <Heart
+                  className={`w-5 h-5 transition-colors ${isLiked ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                />
               </motion.button>
-              
-              <motion.button 
-                onClick={onPrevious}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <SkipBack className="w-4 h-4 md:w-5 md:h-5 fill-current" />
-              </motion.button>
-              
+
+              {/* Play/Pause */}
               <motion.button
                 onClick={onTogglePlay}
-                className="w-10 h-10 md:w-12 md:h-12 rounded-full gradient-primary flex items-center justify-center glow-primary"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center shadow-md shadow-primary/30"
+                whileTap={{ scale: 0.92 }}
               >
                 <AnimatePresence mode="wait">
                   {isPlaying ? (
-                    <motion.div
-                      key="pause"
-                      initial={{ scale: 0, rotate: -90 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      exit={{ scale: 0, rotate: 90 }}
-                    >
-                      <Pause className="w-4 h-4 md:w-5 md:h-5 text-primary-foreground fill-primary-foreground" />
+                    <motion.div key="pause" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                      <Pause className="w-4 h-4 text-primary-foreground fill-primary-foreground" />
                     </motion.div>
                   ) : (
-                    <motion.div
-                      key="play"
-                      initial={{ scale: 0, rotate: 90 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      exit={{ scale: 0, rotate: -90 }}
-                    >
-                      <Play className="w-4 h-4 md:w-5 md:h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+                    <motion.div key="play" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                      <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground ml-0.5" />
                     </motion.div>
                   )}
                 </AnimatePresence>
               </motion.button>
-              
-              <motion.button 
-                onClick={onNext}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <SkipForward className="w-4 h-4 md:w-5 md:h-5 fill-current" />
-              </motion.button>
-              
+
+              {/* Next */}
               <motion.button
-                onClick={onRepeat}
-                className={`hidden md:block relative transition-colors ${repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                whileHover={{ scale: 1.1 }}
+                onClick={onNext}
                 whileTap={{ scale: 0.9 }}
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               >
-                <Repeat className="w-4 h-4" />
-                {repeatMode === "one" && (
-                  <span className="absolute -top-1 -right-1.5 text-[10px] font-bold text-primary">1</span>
-                )}
+                <SkipForward className="w-5 h-5 fill-current" />
               </motion.button>
             </div>
-
-            {/* Progress Bar */}
-            <div className="hidden md:flex items-center gap-3 w-full">
-              <span className="text-xs text-muted-foreground w-10 text-right font-medium">
-                {timeFormatter(currentTime)}
-              </span>
-              <div className="flex-1 group relative h-6 flex items-center">
-                <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full gradient-primary rounded-full relative"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={progress}
-                  onChange={(e) => onSeek?.(Number(e.target.value))}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                />
-                <motion.div
-                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-foreground shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: `calc(${progress}% - 8px)` }}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground w-10 font-medium">
-                {timeFormatter(duration)}
-              </span>
-            </div>
-          </div>
-
-          {/* Right - Volume & Other Controls */}
-          <div className="flex items-center justify-end gap-2 md:gap-4 w-[35%] md:w-[30%]">
-            {/* Premium indicator */}
-            {isPremium && (
-              <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/20 text-primary text-xs">
-                <Crown className="w-3 h-3" />
-                <span className="font-medium">Pro</span>
-              </div>
-            )}
-            
-            <motion.button 
-              onClick={onToggleLike}
-              className="sm:hidden"
-              whileTap={{ scale: 0.9 }}
-            >
-              <Heart className={`w-5 h-5 transition-colors ${isLiked ? "fill-accent text-accent" : "text-muted-foreground hover:text-foreground"}`} />
-            </motion.button>
-
-            
-            <motion.button 
-              onClick={onShowQueue}
-              className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <ListMusic className="w-4 h-4" />
-            </motion.button>
-
-            <div className="hidden md:flex items-center gap-2 group">
-              <motion.button 
-                onClick={handleMuteToggle}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                {localMuted || localVolume === 0 ? (
-                  <VolumeX className="w-4 h-4" />
-                ) : (
-                  <Volume2 className="w-4 h-4" />
-                )}
-              </motion.button>
-              <div className="w-24 relative h-6 flex items-center">
-                <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-foreground group-hover:gradient-primary rounded-full"
-                    style={{ width: `${localMuted ? 0 : localVolume}%` }}
-                  />
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={localMuted ? 0 : localVolume}
-                  onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                />
-              </div>
-            </div>
-            
-            <motion.button 
-              className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Maximize2 className="w-4 h-4" />
-            </motion.button>
-          </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </div>
     </footer>
   );
 };
