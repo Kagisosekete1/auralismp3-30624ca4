@@ -1,10 +1,10 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import {
-  Play, Pause, SkipBack, SkipForward,
+  Play, Pause, SkipForward,
   Shuffle, Repeat, Volume2, VolumeX,
   Heart, ListMusic, ChevronDown, Music2, Crown
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import VideoReelPlayer from "./VideoReelPlayer";
 
 interface FullScreenPlayerProps {
@@ -49,11 +49,43 @@ const FullScreenPlayer = ({
 }: FullScreenPlayerProps) => {
   const [localVolume, setLocalVolume] = useState(volume);
 
+  // Swipe gesture state
+  const dragY = useMotionValue(0);
+  const dragX = useMotionValue(0);
+  const opacity = useTransform(dragY, [0, 200], [1, 0]);
+  const scale = useTransform(dragY, [0, 200], [1, 0.92]);
+
   const currentTime = duration ? (progress / 100) * duration : 0;
 
   const handleVolumeChange = (val: number) => {
     setLocalVolume(val);
     onVolumeChange(val);
+  };
+
+  const handleDragEnd = (_: any, info: { offset: { y: number; x: number }; velocity: { y: number; x: number } }) => {
+    const { y, x } = info.offset;
+    const { y: vy, x: vx } = info.velocity;
+
+    // Swipe down to close
+    if (y > 100 || vy > 500) {
+      onClose();
+      return;
+    }
+
+    // Swipe left = next track
+    if (x < -80 || vx < -400) {
+      onNext();
+      return;
+    }
+
+    // Swipe right = previous track
+    if (x > 80 || vx > 400) {
+      onPrevious();
+      return;
+    }
+
+    dragY.set(0);
+    dragX.set(0);
   };
 
   if (!currentTrack) return null;
@@ -62,11 +94,12 @@ const FullScreenPlayer = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[100] flex flex-col"
+          className="fixed inset-0 z-[100] flex flex-col touch-none"
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          style={{ opacity }}
         >
           {/* Dynamic background from cover art */}
           <div className="absolute inset-0 bg-background">
@@ -81,10 +114,20 @@ const FullScreenPlayer = ({
             )}
           </div>
 
+          {/* Drag layer over album art area */}
+          <motion.div
+            className="absolute inset-0 z-10"
+            drag
+            dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
+            dragElastic={0.3}
+            style={{ y: dragY, x: dragX }}
+            onDragEnd={handleDragEnd}
+          />
+
           {/* Content */}
-          <div className="relative flex flex-col h-full px-6 pt-safe pb-safe">
+          <div className="relative z-20 flex flex-col h-full px-6 pt-safe pb-safe pointer-events-none">
             {/* Top Bar */}
-            <div className="flex items-center justify-between pt-12 pb-6">
+            <div className="flex items-center justify-between pt-12 pb-6 pointer-events-auto">
               <motion.button
                 onClick={onClose}
                 className="w-10 h-10 rounded-full glass flex items-center justify-center"
@@ -110,8 +153,9 @@ const FullScreenPlayer = ({
               className="flex-1 flex items-center justify-center py-4"
               animate={{ scale: isPlaying ? 1 : 0.92 }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
+              style={{ scale }}
             >
-              <div className="w-full max-w-sm aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
+              <div className="w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
                 {currentTrack.videoReelUrl ? (
                   <VideoReelPlayer
                     videoUrl={currentTrack.videoReelUrl}
@@ -127,26 +171,48 @@ const FullScreenPlayer = ({
                   />
                 ) : (
                   <div className="w-full h-full bg-surface-elevated flex items-center justify-center">
-                    <Music2 className="w-24 h-24 text-muted-foreground/40" />
+                    <Music2 className="w-20 h-20 text-muted-foreground/40" />
                   </div>
                 )}
               </div>
             </motion.div>
 
             {/* Track Info + Like */}
-            <div className="flex items-center justify-between py-4">
-              <div className="flex-1 min-w-0 mr-4">
-                <h2 className="text-2xl font-display font-bold text-foreground truncate">
-                  {currentTrack.title}
-                </h2>
-                <p className="text-base text-muted-foreground truncate mt-0.5">
-                  {currentTrack.artist}
-                </p>
+            <div className="flex items-center justify-between py-4 pointer-events-auto overflow-hidden">
+              <div className="flex-1 min-w-0 mr-4 overflow-hidden">
+                {/* Marquee title */}
+                <div className="overflow-hidden relative">
+                  <motion.h2
+                    className="text-2xl font-display font-bold text-foreground whitespace-nowrap"
+                    animate={currentTrack.title.length > 20 ? {
+                      x: ["0%", "-50%"],
+                    } : { x: 0 }}
+                    transition={currentTrack.title.length > 20 ? {
+                      x: { repeat: Infinity, repeatType: "loop", duration: 8, ease: "linear", repeatDelay: 2 },
+                    } : {}}
+                  >
+                    {currentTrack.title.length > 20 ? `${currentTrack.title}   •   ${currentTrack.title}` : currentTrack.title}
+                  </motion.h2>
+                </div>
+                {/* Marquee artist */}
+                <div className="overflow-hidden relative mt-0.5">
+                  <motion.p
+                    className="text-base text-muted-foreground whitespace-nowrap"
+                    animate={currentTrack.artist.length > 24 ? {
+                      x: ["0%", "-50%"],
+                    } : { x: 0 }}
+                    transition={currentTrack.artist.length > 24 ? {
+                      x: { repeat: Infinity, repeatType: "loop", duration: 10, ease: "linear", repeatDelay: 2 },
+                    } : {}}
+                  >
+                    {currentTrack.artist.length > 24 ? `${currentTrack.artist}   •   ${currentTrack.artist}` : currentTrack.artist}
+                  </motion.p>
+                </div>
               </div>
               <motion.button
                 onClick={onToggleLike}
                 whileTap={{ scale: 0.85 }}
-                className="flex-shrink-0"
+                className="flex-shrink-0 pointer-events-auto"
               >
                 <Heart
                   className={`w-7 h-7 transition-all duration-200 ${
@@ -159,7 +225,7 @@ const FullScreenPlayer = ({
             </div>
 
             {/* Progress Bar */}
-            <div className="py-2">
+            <div className="py-2 pointer-events-auto">
               <div className="relative group h-10 flex items-center">
                 <div className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden">
                   <motion.div
@@ -176,7 +242,6 @@ const FullScreenPlayer = ({
                   onChange={(e) => onSeek(Number(e.target.value))}
                   className="absolute inset-0 w-full opacity-0 cursor-pointer h-full"
                 />
-                {/* Thumb indicator */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-foreground shadow-lg pointer-events-none"
                   style={{ left: `calc(${progress}% - 8px)` }}
@@ -188,22 +253,14 @@ const FullScreenPlayer = ({
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex items-center justify-between py-4">
+            {/* Controls — only shuffle, play, next, repeat (no prev/back per request) */}
+            <div className="flex items-center justify-between py-4 pointer-events-auto">
               <motion.button
                 onClick={onShuffle}
                 className={`transition-colors ${isShuffled ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
                 whileTap={{ scale: 0.9 }}
               >
                 <Shuffle className="w-5 h-5" />
-              </motion.button>
-
-              <motion.button
-                onClick={onPrevious}
-                className="text-foreground hover:text-primary transition-colors"
-                whileTap={{ scale: 0.9 }}
-              >
-                <SkipBack className="w-8 h-8 fill-current" />
               </motion.button>
 
               <motion.button
@@ -246,7 +303,7 @@ const FullScreenPlayer = ({
             </div>
 
             {/* Bottom Actions */}
-            <div className="flex items-center justify-between pb-8 pt-2">
+            <div className="flex items-center justify-between pb-8 pt-2 pointer-events-auto">
               <motion.button
                 onClick={onToggleMute}
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -284,6 +341,11 @@ const FullScreenPlayer = ({
               >
                 <ListMusic className="w-5 h-5" />
               </motion.button>
+            </div>
+
+            {/* Swipe hint */}
+            <div className="flex justify-center pb-6 pointer-events-none">
+              <p className="text-xs text-muted-foreground/50">Swipe down to close · Swipe left/right to skip</p>
             </div>
           </div>
         </motion.div>

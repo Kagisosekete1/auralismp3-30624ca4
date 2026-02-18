@@ -61,20 +61,31 @@ export const useAudioPlayer = () => {
   }, [currentTrack, progress, initialized]);
 
   // Handle visibility change (background playback control)
+  // Premium users: music continues in background
+  // Free users: pause when app goes to background
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && !isPremium && isPlaying && audioRef.current) {
-        // Free users: pause when app goes to background
         audioRef.current.pause();
         setIsPlaying(false);
       }
+      // Premium users: do nothing — audio element continues playing natively
     };
+
+    // Set media session metadata for lock screen / notification controls (all users)
+    if ('mediaSession' in navigator && currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        artwork: currentTrack.coverUrl ? [{ src: currentTrack.coverUrl, sizes: '512x512' }] : [],
+      });
+    }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isPremium, isPlaying]);
+  }, [isPremium, isPlaying, currentTrack]);
 
   // Initialize audio element
   useEffect(() => {
