@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import NowPlayingBar from "@/components/NowPlayingBar";
+import FullScreenPlayer from "@/components/FullScreenPlayer";
 import TopBar from "@/components/TopBar";
 import MobileNav from "@/components/MobileNav";
 import CreatePlaylistModal from "@/components/CreatePlaylistModal";
@@ -49,6 +50,7 @@ const Index = () => {
     setSidebarOpen,
   } = useSessionPersistence();
 
+  const [showFullScreenPlayer, setShowFullScreenPlayer] = useState(false);
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [showUploadMusic, setShowUploadMusic] = useState(false);
@@ -254,7 +256,34 @@ const Index = () => {
         onRepeat={cycleRepeat}
         isShuffled={shuffleEnabled}
         repeatMode={repeatMode}
-        onShowQueue={() => setShowQueue(true)}
+      onShowQueue={() => setShowQueue(true)}
+        isPremium={isPremium}
+        onTrackClick={() => setShowFullScreenPlayer(true)}
+      />
+
+      <FullScreenPlayer
+        isOpen={showFullScreenPlayer}
+        onClose={() => setShowFullScreenPlayer(false)}
+        currentTrack={nowPlayingTrack}
+        isPlaying={isPlaying}
+        onTogglePlay={togglePlay}
+        isLiked={currentTrack ? likedTrackIds.includes(currentTrack.id) : false}
+        onToggleLike={handleToggleLikeCurrentTrack}
+        progress={progress}
+        duration={duration}
+        onSeek={seek}
+        volume={volume}
+        onVolumeChange={setVolume}
+        isMuted={isMuted}
+        onToggleMute={() => setIsMuted(!isMuted)}
+        formatTime={formatTime}
+        onNext={() => { const next = playNext(); if (next) handlePlayTrack(next); }}
+        onPrevious={() => { const prev = playPrevious(); if (prev) handlePlayTrack(prev); }}
+        onShuffle={toggleShuffle}
+        onRepeat={cycleRepeat}
+        isShuffled={shuffleEnabled}
+        repeatMode={repeatMode}
+        onShowQueue={() => { setShowFullScreenPlayer(false); setShowQueue(true); }}
         isPremium={isPremium}
       />
 
