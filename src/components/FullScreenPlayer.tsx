@@ -155,7 +155,7 @@ const FullScreenPlayer = ({
               transition={{ duration: 0.4, ease: "easeInOut" }}
               style={{ scale }}
             >
-              <div className="w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
+              <div className="w-full max-w-[280px] md:max-w-[360px] lg:max-w-[400px] aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
                 {currentTrack.videoReelUrl ? (
                   <VideoReelPlayer
                     videoUrl={currentTrack.videoReelUrl}

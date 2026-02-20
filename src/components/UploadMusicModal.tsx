@@ -48,19 +48,22 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const validTypes = ["audio/mpeg", "audio/wav", "audio/flac", "audio/aiff", "audio/x-aiff"];
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|flac|aiff)$/i)) {
-        toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
-        return;
-      }
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error("File size must be under 100MB");
-        return;
-      }
-      setAudioFile(file);
-      toast.success(`Audio file "${file.name}" selected`);
+    if (!file) return;
+    
+    const isAudio = file.type.startsWith("audio/") || file.name.match(/\.(mp3|wav|flac|aiff|m4a|ogg|wma|aac)$/i);
+    if (!isAudio) {
+      toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
+      e.target.value = "";
+      return;
     }
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File size must be under 100MB");
+      e.target.value = "";
+      return;
+    }
+    setAudioFile(file);
+    toast.success(`Audio file "${file.name}" selected`);
+    e.target.value = "";
   };
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,7 +288,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Files</h3>
                   <div className="space-y-4">
                     {/* Audio File Upload */}
-                    <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,audio/*" onChange={handleAudioSelect} className="hidden" />
+                    <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,.m4a,.ogg,.aac,audio/*" onChange={handleAudioSelect} className="hidden" />
                     <div 
                       onClick={() => audioInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}

@@ -1,0 +1,21 @@
+{
+  "name": "Auralis",
+  "short_name": "Auralis",
+  "description": "Stream and discover music on Auralis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#c026d3",
+  "icons": [
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/VFzkOV9U03dFGBDJzjIrzQ2nVUm2/uploads/1769012042370-Logo A.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/VFzkOV9U03dFGBDJzjIrzQ2nVUm2/uploads/1769012042370-Logo A.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
