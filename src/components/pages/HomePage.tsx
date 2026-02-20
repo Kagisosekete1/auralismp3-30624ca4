@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import TrackCard from "../TrackCard";
+import PremiumUpsellBanner from "../PremiumUpsellBanner";
 import type { Playlist } from "@/hooks/useAppState";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -46,6 +47,8 @@ export interface HomePageProps {
   onPlayTrack?: (track: Track) => void;
   onViewProfile?: (userId: string) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onUpgrade?: () => void;
+  onArtistClick?: (track: Track) => void;
 }
 
 const itemVariants = {
@@ -81,11 +84,11 @@ const QuickPickTile = ({ item, onPlay }: { item: RecentPlaylistItem; onPlay: () 
   </motion.button>
 );
 
-const TrackRow = ({ tracks, onPlayTrack, onAddToPlaylist }: { tracks: Track[]; onPlayTrack?: (t: Track) => void; onAddToPlaylist?: (t: Track) => void }) => (
+const TrackRow = ({ tracks, onPlayTrack, onAddToPlaylist, onArtistClick }: { tracks: Track[]; onPlayTrack?: (t: Track) => void; onAddToPlaylist?: (t: Track) => void; onArtistClick?: (t: Track) => void }) => (
   <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-4 md:px-8">
     {tracks.map((track) => (
       <div key={track.id} className="flex-shrink-0 w-36 md:w-40">
-        <TrackCard track={track} onPlay={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
+        <TrackCard track={track} onPlay={onPlayTrack} onAddToPlaylist={onAddToPlaylist} onArtistClick={onArtistClick} />
       </div>
     ))}
   </div>
@@ -179,7 +182,7 @@ const ArtistMiniCard = ({ artist, onViewProfile, onPlayTrack, onAddToPlaylist }:
   );
 };
 
-const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist }: HomePageProps) => {
+const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist, onUpgrade, onArtistClick }: HomePageProps) => {
   const { user } = useAuth();
   const { profile } = useDatabase();
   const [totalPlays, setTotalPlays] = useState(0);
@@ -447,7 +450,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       {weeklyTrending.length > 0 && (
         <section className="py-3">
           <SectionHeader title="Trending This Week" icon={Flame} />
-          <TrackRow tracks={weeklyTrending} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
+          <TrackRow tracks={weeklyTrending} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} onArtistClick={onArtistClick} />
         </section>
       )}
 
@@ -455,7 +458,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       {forYouTracks.length > 0 && (
         <section className="py-3">
           <SectionHeader title="Made For You" icon={Sparkles} />
-          <TrackRow tracks={forYouTracks} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
+          <TrackRow tracks={forYouTracks} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} onArtistClick={onArtistClick} />
         </section>
       )}
 
@@ -486,7 +489,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       {recommendedTracks.length > 0 && userGenre && (
         <section className="py-3">
           <SectionHeader title={`More ${userGenre}`} icon={Headphones} />
-          <TrackRow tracks={recommendedTracks} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
+          <TrackRow tracks={recommendedTracks} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} onArtistClick={onArtistClick} />
         </section>
       )}
 
@@ -494,8 +497,13 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       {liveTracks.length > 0 && (
         <section className="py-3">
           <SectionHeader title="New Uploads" icon={TrendingUp} />
-          <TrackRow tracks={liveTracks.slice(0, 12)} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} />
+          <TrackRow tracks={liveTracks.slice(0, 12)} onPlayTrack={onPlayTrack} onAddToPlaylist={onAddToPlaylist} onArtistClick={onArtistClick} />
         </section>
+      )}
+
+      {/* Premium Upsell for free users */}
+      {profile?.subscription_tier !== 'pro' && profile?.subscription_tier !== 'artist' && onUpgrade && (
+        <PremiumUpsellBanner onUpgrade={onUpgrade} />
       )}
 
       {/* Empty state */}

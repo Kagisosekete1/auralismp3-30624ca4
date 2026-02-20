@@ -192,35 +192,42 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const validTypes = ["audio/mpeg", "audio/wav", "audio/flac", "audio/aiff", "audio/x-aiff"];
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|flac|aiff)$/i)) {
-        toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
-        return;
-      }
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error("File size must be under 100MB");
-        return;
-      }
-      
-      // For singles, just add the single track
-      if (formData.releaseType === "single") {
-        setTrackFiles([{ id: Date.now().toString(), file, title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") }]);
-      } else {
-        // For albums/EPs, check track limit
-        if (trackFiles.length >= maxTracks) {
-          toast.error(`Maximum ${maxTracks} tracks allowed. Upgrade to Pro for more.`);
-          return;
-        }
-        setTrackFiles(prev => [...prev, { 
-          id: Date.now().toString(), 
-          file, 
-          title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") 
-        }]);
-        setCurrentTrackTitle("");
-      }
-      toast.success(`Track "${file.name}" added`);
+    if (!file) return;
+    
+    // Accept any audio type or common audio extensions
+    const isAudio = file.type.startsWith("audio/") || file.name.match(/\.(mp3|wav|flac|aiff|m4a|ogg|wma|aac)$/i);
+    if (!isAudio) {
+      toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
+      // Reset input so user can retry
+      e.target.value = "";
+      return;
     }
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File size must be under 100MB");
+      e.target.value = "";
+      return;
+    }
+    
+    // For singles, just add the single track
+    if (formData.releaseType === "single") {
+      setTrackFiles([{ id: Date.now().toString(), file, title: currentTrackTitle || formData.title || file.name.replace(/\.[^/.]+$/, "") }]);
+    } else {
+      // For albums/EPs, check track limit
+      if (trackFiles.length >= maxTracks) {
+        toast.error(`Maximum ${maxTracks} tracks allowed.`);
+        e.target.value = "";
+        return;
+      }
+      setTrackFiles(prev => [...prev, { 
+        id: Date.now().toString(), 
+        file, 
+        title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") 
+      }]);
+      setCurrentTrackTitle("");
+    }
+    toast.success(`Track "${file.name}" added`);
+    // Reset input value so same file can be re-selected if needed
+    e.target.value = "";
   };
 
   const removeTrack = (trackId: string) => {
@@ -699,7 +706,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 )}
                 
                 <div className="space-y-4">
-                  <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,audio/*" onChange={handleAudioSelect} className="hidden" />
+                  <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,.m4a,.ogg,.aac,audio/*" onChange={handleAudioSelect} className="hidden" />
                   
                   {/* Add Track Button */}
                   <div 

@@ -17,6 +17,7 @@ interface TrackCardProps {
   track: Track;
   onPlay?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onArtistClick?: (track: Track) => void;
   variant?: "default" | "compact";
 }
 
@@ -26,7 +27,7 @@ const formatPlayCount = (count: number) => {
   return count.toString();
 };
 
-const TrackCard = ({ track, onPlay, onAddToPlaylist, variant = "default" }: TrackCardProps) => {
+const TrackCard = ({ track, onPlay, onAddToPlaylist, onArtistClick, variant = "default" }: TrackCardProps) => {
   return (
     <motion.div
       className="group relative rounded-2xl overflow-hidden bg-card hover:bg-card-hover border border-border/20 hover:border-primary/30 transition-all duration-300"
@@ -87,7 +88,15 @@ const TrackCard = ({ track, onPlay, onAddToPlaylist, variant = "default" }: Trac
         >
           {track.title}
         </h3>
-        <p className="text-[11px] md:text-xs text-muted-foreground truncate mt-0.5">{track.artist_name}</p>
+        <p 
+          className="text-[11px] md:text-xs text-muted-foreground truncate mt-0.5 cursor-pointer hover:text-primary transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onArtistClick?.(track);
+          }}
+        >
+          {track.artist_name}
+        </p>
 
         {/* Save to Playlist */}
         <motion.button
