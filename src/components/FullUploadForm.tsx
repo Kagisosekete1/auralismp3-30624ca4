@@ -711,7 +711,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 )}
                 
                 <div className="space-y-4">
-                  <input ref={audioInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.aiff,.m4a,.ogg,.aac" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={audioInputRef} type="file" accept="*/*" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   
                   {/* Add Track Button */}
                   <div 
@@ -779,7 +779,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     </div>
                   )}
 
-                  <input ref={coverInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp" onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={coverInputRef} type="file" accept="*/*" onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   <div 
                     onClick={() => coverInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
