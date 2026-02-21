@@ -50,7 +50,9 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const isAudio = file.type.startsWith("audio/") || file.name.match(/\.(mp3|wav|flac|aiff|m4a|ogg|wma|aac)$/i);
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const audioExtensions = ['mp3','wav','flac','aiff','aif','m4a','ogg','wma','aac','opus','webm'];
+    const isAudio = file.type.startsWith("audio/") || file.type === 'application/octet-stream' || audioExtensions.includes(ext);
     if (!isAudio) {
       toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
       e.target.value = "";
@@ -68,18 +70,21 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please upload an image file");
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("Cover image must be under 10MB");
-        return;
-      }
-      setCoverFile(file);
-      toast.success(`Cover art "${file.name}" selected`);
+    if (!file) return;
+    const isImage = file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|heic|heif)$/i);
+    if (!isImage) {
+      toast.error("Please upload an image file");
+      e.target.value = "";
+      return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Cover image must be under 10MB");
+      e.target.value = "";
+      return;
+    }
+    setCoverFile(file);
+    toast.success(`Cover art "${file.name}" selected`);
+    e.target.value = "";
   };
 
   const handleSubmit = async () => {
@@ -288,7 +293,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Files</h3>
                   <div className="space-y-4">
                     {/* Audio File Upload */}
-                    <input ref={audioInputRef} type="file" accept=".mp3,.wav,.flac,.aiff,.m4a,.ogg,.aac,audio/*" onChange={handleAudioSelect} className="hidden" />
+                    <input ref={audioInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.aiff,.m4a,.ogg,.aac" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
                       onClick={() => audioInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
@@ -311,7 +316,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                     </div>
 
                     {/* Cover Art Upload */}
-                    <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
+                    <input ref={coverInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp" onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
                       onClick={() => coverInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
