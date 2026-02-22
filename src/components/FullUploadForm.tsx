@@ -192,17 +192,20 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Accept any audio type or common audio extensions
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const audioExtensions = ['mp3','wav','flac','aiff','aif','m4a','ogg','wma','aac','opus','webm'];
-    const isAudio = file.type.startsWith("audio/") || file.type === 'application/octet-stream' || audioExtensions.includes(ext);
-    if (!isAudio) {
-      toast.error("Please upload a valid audio file (MP3, WAV, FLAC, AIFF)");
-      // Reset input so user can retry
-      e.target.value = "";
+    if (!file) {
+      console.log("No file selected");
       return;
+    }
+    
+    console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
+    
+    // On mobile, MIME types are unreliable — accept all files and just check extension as a hint
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const audioExtensions = ['mp3','wav','flac','aiff','aif','m4a','ogg','wma','aac','opus','webm','3gp','amr','mp4'];
+    const isLikelyAudio = file.type.startsWith("audio/") || file.type === 'application/octet-stream' || file.type === '' || audioExtensions.includes(ext);
+    if (!isLikelyAudio) {
+      // Still allow it but warn — mobile browsers often misreport types
+      console.warn("File may not be audio:", file.name, file.type);
     }
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
@@ -243,13 +246,12 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const isImage = file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|heic|heif)$/i);
-    if (!isImage) {
-      toast.error("Please upload an image file");
-      e.target.value = "";
+    if (!file) {
+      console.log("No cover file selected");
       return;
     }
+    console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
+    // On mobile, accept any file — don't block based on MIME type
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
       e.target.value = "";
