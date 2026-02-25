@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -36,8 +36,21 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
-  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer();
   const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
+  
+  const playNextRef = useRef(playNext);
+  playNextRef.current = playNext;
+  const playTrackFnRef = useRef<((track: any) => void) | null>(null);
+
+  const handleAutoNext = useCallback(() => {
+    const next = playNextRef.current();
+    if (next && playTrackFnRef.current) {
+      playTrackFnRef.current(next);
+    }
+  }, []);
+
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext);
+  playTrackFnRef.current = playTrack;
   
   // Use session persistence for navigation state
   const {
