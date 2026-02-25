@@ -60,32 +60,29 @@ export const useAudioPlayer = () => {
     }
   }, [currentTrack, progress, initialized]);
 
-  // Handle visibility change (background playback control)
-  // Premium users: music continues in background
-  // Free users: pause when app goes to background
+  // Set media session metadata and action handlers for lock screen / notification controls
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && !isPremium && isPlaying && audioRef.current) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
-      // Premium users: do nothing — audio element continues playing natively
-    };
-
-    // Set media session metadata for lock screen / notification controls (all users)
     if ('mediaSession' in navigator && currentTrack) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist,
         artwork: currentTrack.coverUrl ? [{ src: currentTrack.coverUrl, sizes: '512x512' }] : [],
       });
-    }
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [isPremium, isPlaying, currentTrack]);
+      navigator.mediaSession.setActionHandler('play', () => {
+        audioRef.current?.play().then(() => setIsPlaying(true)).catch(console.error);
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (audioRef.current && details.seekTime != null) {
+          audioRef.current.currentTime = details.seekTime;
+        }
+      });
+    }
+  }, [currentTrack]);
 
   // Initialize audio element
   useEffect(() => {
