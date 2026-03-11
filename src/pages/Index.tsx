@@ -320,8 +320,8 @@ const Index = () => {
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(!isMuted)}
         formatTime={formatTime}
-        onNext={() => playNext()}
-        onPrevious={() => playPrevious()}
+        onNext={handleNextTrack}
+        onPrevious={handlePreviousTrack}
         onShuffle={toggleShuffle}
         onRepeat={cycleRepeat}
         isShuffled={shuffleEnabled}
