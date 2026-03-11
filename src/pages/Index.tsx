@@ -288,7 +288,7 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
     }
   };
 
