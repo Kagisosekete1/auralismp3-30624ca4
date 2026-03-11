@@ -72,6 +72,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   
   const [trackFiles, setTrackFiles] = useState<TrackFile[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [currentTrackTitle, setCurrentTrackTitle] = useState("");
 
   const defaultFormData = {
