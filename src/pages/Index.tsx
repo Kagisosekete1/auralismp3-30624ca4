@@ -164,6 +164,43 @@ const Index = () => {
     if (index !== -1) removeFromQueue(index);
   };
 
+  const buildQueueTrack = useCallback((track: any): QueueTrack => ({
+    id: track.id,
+    title: track.title || track.name,
+    artist: track.artist_name || track.artist,
+    audioUrl: track.audio_url || track.audioUrl,
+    coverUrl: track.cover_url || track.coverUrl,
+    duration: track.duration,
+  }), []);
+
+  const handlePlayQueuedTrack = useCallback((track: QueueTrack | null) => {
+    if (!track) return;
+    playTrackFnRef.current?.(track);
+  }, []);
+
+  const handleNextTrack = useCallback(() => {
+    handlePlayQueuedTrack(playNext());
+  }, [playNext, handlePlayQueuedTrack]);
+
+  const handlePreviousTrack = useCallback(() => {
+    handlePlayQueuedTrack(playPrevious());
+  }, [playPrevious, handlePlayQueuedTrack]);
+
+  const handlePlayAllTracks = useCallback((startIndex = 0, shuffled = false) => {
+    if (tracks.length === 0) return;
+
+    const queueTracks = tracks.map(buildQueueTrack);
+    const orderedTracks = shuffled ? [...queueTracks].sort(() => Math.random() - 0.5) : queueTracks;
+    const startTrack = setQueueAndPlay(orderedTracks, Math.min(startIndex, orderedTracks.length - 1));
+
+    if (shuffled !== shuffleEnabled) {
+      toggleShuffle();
+    }
+
+    handlePlayQueuedTrack(startTrack);
+  }, [tracks, buildQueueTrack, setQueueAndPlay, shuffleEnabled, toggleShuffle, handlePlayQueuedTrack]);
+
+
   const sidebarPlaylists = playlists.map((p) => ({
     id: p.id,
     name: p.name,
