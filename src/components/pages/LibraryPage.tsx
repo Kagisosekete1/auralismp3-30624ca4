@@ -34,7 +34,7 @@ export interface LibraryPageProps {
   onShuffleAll?: () => void;
 }
 
-const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist, onLikedSongs, tracks = [], onPlayTrack, isArtist = false }: LibraryPageProps) => {
+const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist, onLikedSongs, tracks = [], onPlayTrack, isArtist = false, onPlayAll, onShuffleAll }: LibraryPageProps) => {
   const { user } = useAuth();
   const [recentPlays, setRecentPlays] = useState<RecentPlay[]>([]);
   const [loading, setLoading] = useState(true);
