@@ -762,7 +762,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 )}
                 
                 <div className="space-y-4">
-                  <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   
                   {/* Add Track Button */}
                   <div 

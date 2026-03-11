@@ -347,7 +347,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Files</h3>
                   <div className="space-y-4">
                     {/* Audio File Upload */}
-                    <input ref={audioInputRef} type="file" accept="*/*" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                    <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
                       onClick={() => audioInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
