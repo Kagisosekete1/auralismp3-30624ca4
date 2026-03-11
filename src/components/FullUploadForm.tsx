@@ -11,6 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
 
+const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
+const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
+
 interface FullUploadFormProps {
   isOpen: boolean;
   onClose: () => void;
