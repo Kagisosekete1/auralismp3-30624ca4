@@ -184,7 +184,7 @@ const ArtistMiniCard = ({ artist, onViewProfile, onPlayTrack, onAddToPlaylist }:
   );
 };
 
-const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist, onUpgrade, onArtistClick }: HomePageProps) => {
+const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist, onUpgrade, onArtistClick, onPlayAll, onShuffleAll }: HomePageProps) => {
   const { user } = useAuth();
   const { profile } = useDatabase();
   const [totalPlays, setTotalPlays] = useState(0);
