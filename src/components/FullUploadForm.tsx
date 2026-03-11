@@ -11,6 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
 
+const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
+const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
+
 interface FullUploadFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,6 +72,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   
   const [trackFiles, setTrackFiles] = useState<TrackFile[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [currentTrackTitle, setCurrentTrackTitle] = useState("");
 
   const defaultFormData = {
@@ -190,6 +197,22 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     }));
   };
 
+  const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch (error) {
+      console.warn("showPicker unavailable, falling back to click()", error);
+    }
+
+    input.click();
+  };
+
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -198,15 +221,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     }
     
     console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-    
-    // On mobile, MIME types are unreliable — accept all files and just check extension as a hint
+
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const audioExtensions = ['mp3','wav','flac','aiff','aif','m4a','ogg','wma','aac','opus','webm','3gp','amr','mp4'];
-    const isLikelyAudio = file.type.startsWith("audio/") || file.type === 'application/octet-stream' || file.type === '' || audioExtensions.includes(ext);
-    if (!isLikelyAudio) {
-      // Still allow it but warn — mobile browsers often misreport types
-      console.warn("File may not be audio:", file.name, file.type);
+    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+    if (!isAllowedAudio) {
+      toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
+      e.target.value = "";
+      return;
     }
+
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
       e.target.value = "";
@@ -231,7 +254,6 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       setCurrentTrackTitle("");
     }
     toast.success(`Track "${file.name}" added`);
-    // Reset input value so same file can be re-selected if needed
     e.target.value = "";
   };
 
@@ -244,6 +266,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     setTrackFiles(prev => prev.map(t => t.id === trackId ? { ...t, title } : t));
   };
 
+  const removeCover = () => {
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
+    setCoverFile(null);
+    toast.success("Cover art removed");
+  };
+
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -251,13 +282,27 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
     console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-    // On mobile, accept any file — don't block based on MIME type
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+    if (!isAllowedImage) {
+      toast.error("Please select a JPG, PNG, or WEBP image");
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
       e.target.value = "";
       return;
     }
+
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+
     setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
     toast.success(`Cover art "${file.name}" selected`);
     e.target.value = "";
   };
@@ -333,6 +378,10 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const resetForm = () => {
     setStep(1);
     setTrackFiles([]);
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
     setCoverFile(null);
     setCurrentTrackTitle("");
     setFormData({
@@ -713,11 +762,11 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 )}
                 
                 <div className="space-y-4">
-                  <input ref={audioInputRef} type="file" accept="*/*" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   
                   {/* Add Track Button */}
                   <div 
-                    onClick={() => audioInputRef.current?.click()}
+                    onClick={() => openFilePicker(audioInputRef)}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${trackFiles.length > 0 ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                   >
                     <div className="flex items-center justify-center gap-3">
@@ -727,10 +776,10 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                       <div className="text-left">
                         <p className="font-medium text-foreground">
                           {formData.releaseType === "single" 
-                            ? (trackFiles.length > 0 ? "Replace Track" : "Add Audio File *")
-                            : "Add Track to Album"}
+                            ? (trackFiles.length > 0 ? "Change Selected Music File" : "Choose Music File *")
+                            : "Add Track from Files"}
                         </p>
-                        <p className="text-sm text-muted-foreground">MP3, WAV, FLAC, AIFF • Max 100MB per file</p>
+                        <p className="text-sm text-muted-foreground">Opens device Files/Storage • MP3, WAV, FLAC, M4A, AAC • Max 100MB</p>
                       </div>
                     </div>
                   </div>
@@ -738,7 +787,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   {/* Track List */}
                   {trackFiles.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-foreground">Tracks ({trackFiles.length})</h4>
+                      <h4 className="text-sm font-medium text-foreground">Selected music file{trackFiles.length > 1 ? 's' : ''} ({trackFiles.length})</h4>
                       {trackFiles.map((track, index) => (
                         <div key={track.id} className="flex items-center gap-3 glass rounded-xl p-3 border border-border/30">
                           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
@@ -781,24 +830,55 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     </div>
                   )}
 
-                  <input ref={coverInputRef} type="file" accept="*/*" onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   <div 
-                    onClick={() => coverInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+                    onClick={() => !coverFile && openFilePicker(coverInputRef)}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50 cursor-pointer'}`}
                   >
                     {coverFile ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <Image className="w-12 h-12 text-primary" />
-                        <div className="text-left">
-                          <p className="font-medium text-foreground">{coverFile.name}</p>
-                          <p className="text-sm text-muted-foreground">{(coverFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="w-24 h-24 rounded-2xl overflow-hidden bg-surface-elevated/60 flex items-center justify-center flex-shrink-0">
+                            {coverPreviewUrl ? (
+                              <img src={coverPreviewUrl} alt="Selected cover art preview" className="w-full h-full object-cover" />
+                            ) : (
+                              <Image className="w-10 h-10 text-primary" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-foreground truncate">{coverFile.name}</p>
+                            <p className="text-sm text-muted-foreground">{(coverFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                            <p className="text-xs text-muted-foreground mt-1">Selected image preview shown before upload</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFilePicker(coverInputRef);
+                            }}
+                            className="px-4 py-2 rounded-xl glass border border-border/40 text-foreground text-sm font-medium"
+                          >
+                            Change Image
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCover();
+                            }}
+                            className="px-4 py-2 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium"
+                          >
+                            Remove Image
+                          </button>
                         </div>
                       </div>
                     ) : (
                       <>
                         <Image className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="font-medium text-foreground mb-1">Upload Cover Art</p>
-                        <p className="text-sm text-muted-foreground">JPG or PNG • Min 3000×3000px recommended</p>
+                        <p className="font-medium text-foreground mb-1">Choose Cover Art</p>
+                        <p className="text-sm text-muted-foreground">Photos, gallery, or files • JPG, JPEG, PNG, WEBP • Preview shown before upload</p>
                       </>
                     )}
                   </div>

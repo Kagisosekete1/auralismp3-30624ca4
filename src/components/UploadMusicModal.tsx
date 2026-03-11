@@ -1,9 +1,15 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image } from "lucide-react";
+import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
+
+const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
+const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
 
 interface UploadMusicModalProps {
   isOpen: boolean;
@@ -23,6 +29,8 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+
 
   const [formData, setFormData] = useState({
     producerName: "", bio: "", primaryGenres: [] as string[], moodTags: "",
@@ -46,6 +54,22 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     }));
   };
 
+  const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch (error) {
+      console.warn("showPicker unavailable, falling back to click()", error);
+    }
+
+    input.click();
+  };
+
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -53,7 +77,15 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
       return;
     }
     console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-    // On mobile, MIME types are unreliable — accept all files
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+    if (!isAllowedAudio) {
+      toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
       e.target.value = "";
@@ -64,6 +96,15 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     e.target.value = "";
   };
 
+  const removeCover = () => {
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
+    setCoverFile(null);
+    toast.success("Cover art removed");
+  };
+
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -71,13 +112,27 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
       return;
     }
     console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-    // On mobile, accept any file — don't block based on MIME type
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+    if (!isAllowedImage) {
+      toast.error("Please select a JPG, PNG, or WEBP image");
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
       e.target.value = "";
       return;
     }
+
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+
     setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
     toast.success(`Cover art "${file.name}" selected`);
     e.target.value = "";
   };
@@ -133,6 +188,10 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
   const resetForm = () => {
     setStep(1);
     setAudioFile(null);
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
     setCoverFile(null);
     setFormData({
       producerName: "", bio: "", primaryGenres: [], moodTags: "",
@@ -288,7 +347,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Files</h3>
                   <div className="space-y-4">
                     {/* Audio File Upload */}
-                    <input ref={audioInputRef} type="file" accept="*/*" onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                    <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
                       onClick={() => audioInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
@@ -311,7 +370,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                     </div>
 
                     {/* Cover Art Upload */}
-                    <input ref={coverInputRef} type="file" accept="*/*" onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                    <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
                       onClick={() => coverInputRef.current?.click()}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}

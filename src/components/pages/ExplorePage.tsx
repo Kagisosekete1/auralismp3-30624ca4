@@ -21,9 +21,11 @@ interface ExplorePageProps {
   onPlayTrack?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
   userPreferredGenre?: string;
+  onPlayAll?: () => void;
+  onShuffleAll?: () => void;
 }
 
-const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredGenre }: ExplorePageProps) => {
+const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredGenre, onPlayAll, onShuffleAll }: ExplorePageProps) => {
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [weeklyTracks, setWeeklyTracks] = useState<Track[]>([]);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
@@ -139,9 +141,20 @@ const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredG
     <div className="flex-1 overflow-y-auto pb-32">
       {/* Header */}
       <div className="gradient-hero pt-6 md:pt-8 pb-8 md:pb-12 px-4 md:px-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <h1 className="text-2xl md:text-5xl font-display font-bold text-foreground mb-1.5">Explore</h1>
           <p className="text-muted-foreground text-sm md:text-lg">Discover trending music and new releases</p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button onClick={onPlayAll} className="px-4 py-2 rounded-xl gradient-primary text-primary-foreground text-sm font-semibold">
+              Play All
+            </button>
+            <button onClick={onShuffleAll} className="px-4 py-2 rounded-xl glass border border-border/30 text-foreground text-sm font-semibold">
+              Shuffle All
+            </button>
+          </div>
         </motion.div>
       </div>
 

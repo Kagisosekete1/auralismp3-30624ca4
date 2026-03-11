@@ -29,18 +29,18 @@ import UpgradePage from "@/components/pages/UpgradePage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { useQueue } from "@/hooks/useQueue";
+import { useQueue, type QueueTrack } from "@/hooks/useQueue";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
-  const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
+  const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious, setQueueAndPlay } = useQueue();
   
   const playNextRef = useRef(playNext);
   playNextRef.current = playNext;
-  const playTrackFnRef = useRef<((track: any) => void) | null>(null);
+  const playTrackFnRef = useRef<((track: QueueTrack) => void) | null>(null);
 
   const handleAutoNext = useCallback(() => {
     const next = playNextRef.current();
@@ -113,7 +113,7 @@ const Index = () => {
   };
 
   const handlePlayTrack = async (track: any) => {
-    const audioTrack = {
+    const audioTrack: QueueTrack = {
       id: track.id,
       title: track.title || track.name,
       artist: track.artist_name || track.artist,
@@ -121,7 +121,7 @@ const Index = () => {
       coverUrl: track.cover_url || track.coverUrl,
       videoReelUrl: track.video_reel_url || track.videoReelUrl,
       duration: track.duration,
-    };
+    } as QueueTrack & { videoReelUrl?: string };
     playTrack(audioTrack);
     addToQueue(audioTrack);
 
@@ -163,6 +163,43 @@ const Index = () => {
     const index = queue.findIndex(t => t.id === trackId);
     if (index !== -1) removeFromQueue(index);
   };
+
+  const buildQueueTrack = useCallback((track: any): QueueTrack => ({
+    id: track.id,
+    title: track.title || track.name,
+    artist: track.artist_name || track.artist,
+    audioUrl: track.audio_url || track.audioUrl,
+    coverUrl: track.cover_url || track.coverUrl,
+    duration: track.duration,
+  }), []);
+
+  const handlePlayQueuedTrack = useCallback((track: QueueTrack | null) => {
+    if (!track) return;
+    playTrackFnRef.current?.(track);
+  }, []);
+
+  const handleNextTrack = useCallback(() => {
+    handlePlayQueuedTrack(playNext());
+  }, [playNext, handlePlayQueuedTrack]);
+
+  const handlePreviousTrack = useCallback(() => {
+    handlePlayQueuedTrack(playPrevious());
+  }, [playPrevious, handlePlayQueuedTrack]);
+
+  const handlePlayAllTracks = useCallback((startIndex = 0, shuffled = false) => {
+    if (tracks.length === 0) return;
+
+    const queueTracks = tracks.map(buildQueueTrack);
+    const orderedTracks = shuffled ? [...queueTracks].sort(() => Math.random() - 0.5) : queueTracks;
+    const startTrack = setQueueAndPlay(orderedTracks, Math.min(startIndex, orderedTracks.length - 1));
+
+    if (shuffled !== shuffleEnabled) {
+      toggleShuffle();
+    }
+
+    handlePlayQueuedTrack(startTrack);
+  }, [tracks, buildQueueTrack, setQueueAndPlay, shuffleEnabled, toggleShuffle, handlePlayQueuedTrack]);
+
 
   const sidebarPlaylists = playlists.map((p) => ({
     id: p.id,
@@ -233,15 +270,15 @@ const Index = () => {
 
     switch (activeSection) {
       case "home":
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "explore":
-        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "genre":
         return <GenrePage />;
       case "artists":
         return <ArtistsPage onViewArtist={handleViewArtist} />;
       case "library":
-        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} />;
+        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "profile":
         return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} />;
       case "settings":
@@ -251,7 +288,7 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
     }
   };
 
@@ -283,8 +320,8 @@ const Index = () => {
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(!isMuted)}
         formatTime={formatTime}
-        onNext={() => playNext()}
-        onPrevious={() => playPrevious()}
+        onNext={handleNextTrack}
+        onPrevious={handlePreviousTrack}
         onShuffle={toggleShuffle}
         onRepeat={cycleRepeat}
         isShuffled={shuffleEnabled}
@@ -310,8 +347,8 @@ const Index = () => {
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(!isMuted)}
         formatTime={formatTime}
-        onNext={() => { const next = playNext(); if (next) handlePlayTrack(next); }}
-        onPrevious={() => { const prev = playPrevious(); if (prev) handlePlayTrack(prev); }}
+        onNext={handleNextTrack}
+        onPrevious={handlePreviousTrack}
         onShuffle={toggleShuffle}
         onRepeat={cycleRepeat}
         isShuffled={shuffleEnabled}
@@ -336,7 +373,7 @@ const Index = () => {
       <FullUploadForm isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} />
       <InboxModal isOpen={showInbox} onClose={() => setShowInbox(false)} />
       <InstallBanner />
-      <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={(t) => playTrack({ id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl, coverUrl: t.coverUrl, duration: t.duration })} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
+      <QueueModal isOpen={showQueue} onClose={() => setShowQueue(false)} queue={queue} currentTrack={nowPlayingTrack} onPlayTrack={handlePlayQueuedTrack} onRemoveFromQueue={handleRemoveFromQueue} onClearQueue={clearQueue} history={history} />
     </motion.div>
   );
 };
