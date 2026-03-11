@@ -272,7 +272,7 @@ const Index = () => {
       case "home":
         return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "explore":
-        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "genre":
         return <GenrePage />;
       case "artists":
