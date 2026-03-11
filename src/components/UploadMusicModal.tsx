@@ -29,6 +29,8 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+
 
   const [formData, setFormData] = useState({
     producerName: "", bio: "", primaryGenres: [] as string[], moodTags: "",
