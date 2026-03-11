@@ -49,6 +49,8 @@ export interface HomePageProps {
   onAddToPlaylist?: (track: Track) => void;
   onUpgrade?: () => void;
   onArtistClick?: (track: Track) => void;
+  onPlayAll?: () => void;
+  onShuffleAll?: () => void;
 }
 
 const itemVariants = {
