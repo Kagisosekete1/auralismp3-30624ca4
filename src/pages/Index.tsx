@@ -113,7 +113,7 @@ const Index = () => {
   };
 
   const handlePlayTrack = async (track: any) => {
-    const audioTrack = {
+    const audioTrack: QueueTrack = {
       id: track.id,
       title: track.title || track.name,
       artist: track.artist_name || track.artist,
@@ -121,7 +121,7 @@ const Index = () => {
       coverUrl: track.cover_url || track.coverUrl,
       videoReelUrl: track.video_reel_url || track.videoReelUrl,
       duration: track.duration,
-    };
+    } as QueueTrack & { videoReelUrl?: string };
     playTrack(audioTrack);
     addToQueue(audioTrack);
 

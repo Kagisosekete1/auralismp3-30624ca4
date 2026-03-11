@@ -188,6 +188,10 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
   const resetForm = () => {
     setStep(1);
     setAudioFile(null);
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
     setCoverFile(null);
     setFormData({
       producerName: "", bio: "", primaryGenres: [], moodTags: "",
