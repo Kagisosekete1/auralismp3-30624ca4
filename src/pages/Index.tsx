@@ -278,7 +278,7 @@ const Index = () => {
       case "artists":
         return <ArtistsPage onViewArtist={handleViewArtist} />;
       case "library":
-        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} />;
+        return <LibraryPage playlists={sidebarPlaylists} likedCount={likedTrackIds.length} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onLikedSongs={() => handleSectionChange("liked")} tracks={tracks} onPlayTrack={handlePlayTrack} isArtist={profile?.is_artist || false} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "profile":
         return <ProfilePage likedCount={likedTrackIds.length} playlistCount={playlists.length} tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} />;
       case "settings":
