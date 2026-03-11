@@ -25,7 +25,7 @@ interface ExplorePageProps {
   onShuffleAll?: () => void;
 }
 
-const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredGenre }: ExplorePageProps) => {
+const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredGenre, onPlayAll, onShuffleAll }: ExplorePageProps) => {
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [weeklyTracks, setWeeklyTracks] = useState<Track[]>([]);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);

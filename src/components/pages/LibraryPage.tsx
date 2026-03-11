@@ -136,9 +136,19 @@ const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist
 
       {/* Recently Played - Vertical List */}
       <section className="px-4 md:px-8 py-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-5 h-5 text-primary" />
-          <h2 className="text-xl md:text-2xl font-display font-bold text-foreground">Recently Played</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            <h2 className="text-xl md:text-2xl font-display font-bold text-foreground">Recently Played</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={onPlayAll} className="px-4 py-2 rounded-xl gradient-primary text-primary-foreground text-sm font-semibold">
+              Play All
+            </button>
+            <button onClick={onShuffleAll} className="px-4 py-2 rounded-xl glass border border-border/30 text-foreground text-sm font-semibold">
+              Shuffle All
+            </button>
+          </div>
         </div>
 
         {loading ? (
