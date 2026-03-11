@@ -197,6 +197,22 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     }));
   };
 
+  const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch (error) {
+      console.warn("showPicker unavailable, falling back to click()", error);
+    }
+
+    input.click();
+  };
+
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -205,15 +221,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     }
     
     console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-    
-    // On mobile, MIME types are unreliable — accept all files and just check extension as a hint
+
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const audioExtensions = ['mp3','wav','flac','aiff','aif','m4a','ogg','wma','aac','opus','webm','3gp','amr','mp4'];
-    const isLikelyAudio = file.type.startsWith("audio/") || file.type === 'application/octet-stream' || file.type === '' || audioExtensions.includes(ext);
-    if (!isLikelyAudio) {
-      // Still allow it but warn — mobile browsers often misreport types
-      console.warn("File may not be audio:", file.name, file.type);
+    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+    if (!isAllowedAudio) {
+      toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
+      e.target.value = "";
+      return;
     }
+
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
       e.target.value = "";
@@ -238,7 +254,6 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       setCurrentTrackTitle("");
     }
     toast.success(`Track "${file.name}" added`);
-    // Reset input value so same file can be re-selected if needed
     e.target.value = "";
   };
 
@@ -251,6 +266,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     setTrackFiles(prev => prev.map(t => t.id === trackId ? { ...t, title } : t));
   };
 
+  const removeCover = () => {
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
+    setCoverFile(null);
+    toast.success("Cover art removed");
+  };
+
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -258,13 +282,27 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
     console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-    // On mobile, accept any file — don't block based on MIME type
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+    if (!isAllowedImage) {
+      toast.error("Please select a JPG, PNG, or WEBP image");
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
       e.target.value = "";
       return;
     }
+
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+
     setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
     toast.success(`Cover art "${file.name}" selected`);
     e.target.value = "";
   };
