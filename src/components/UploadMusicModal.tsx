@@ -1,9 +1,15 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image } from "lucide-react";
+import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
+
+const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
+const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
 
 interface UploadMusicModalProps {
   isOpen: boolean;

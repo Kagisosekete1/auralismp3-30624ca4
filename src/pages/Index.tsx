@@ -29,7 +29,7 @@ import UpgradePage from "@/components/pages/UpgradePage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { useQueue } from "@/hooks/useQueue";
+import { useQueue, type QueueTrack } from "@/hooks/useQueue";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 
 const Index = () => {
