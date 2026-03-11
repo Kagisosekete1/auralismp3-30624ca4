@@ -30,6 +30,8 @@ export interface LibraryPageProps {
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
   isArtist?: boolean;
+  onPlayAll?: () => void;
+  onShuffleAll?: () => void;
 }
 
 const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist, onLikedSongs, tracks = [], onPlayTrack, isArtist = false }: LibraryPageProps) => {

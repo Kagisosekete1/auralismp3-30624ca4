@@ -21,6 +21,8 @@ interface ExplorePageProps {
   onPlayTrack?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
   userPreferredGenre?: string;
+  onPlayAll?: () => void;
+  onShuffleAll?: () => void;
 }
 
 const ExplorePage = ({ tracks = [], onPlayTrack, onAddToPlaylist, userPreferredGenre }: ExplorePageProps) => {
