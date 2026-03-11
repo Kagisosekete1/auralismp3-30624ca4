@@ -378,6 +378,10 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const resetForm = () => {
     setStep(1);
     setTrackFiles([]);
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
     setCoverFile(null);
     setCurrentTrackTitle("");
     setFormData({
