@@ -36,11 +36,11 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
-  const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious } = useQueue();
+  const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious, setQueueAndPlay } = useQueue();
   
   const playNextRef = useRef(playNext);
   playNextRef.current = playNext;
-  const playTrackFnRef = useRef<((track: any) => void) | null>(null);
+  const playTrackFnRef = useRef<((track: QueueTrack) => void) | null>(null);
 
   const handleAutoNext = useCallback(() => {
     const next = playNextRef.current();
