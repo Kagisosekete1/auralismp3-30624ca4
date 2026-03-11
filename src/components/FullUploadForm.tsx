@@ -830,7 +830,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     </div>
                   )}
 
-                  <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   <div 
                     onClick={() => !coverFile && openFilePicker(coverInputRef)}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50 cursor-pointer'}`}
