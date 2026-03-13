@@ -49,7 +49,7 @@ const Index = () => {
     }
   }, []);
 
-  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext);
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext, handlePreviousTrack);
   playTrackFnRef.current = playTrack;
   
   // Use session persistence for navigation state
