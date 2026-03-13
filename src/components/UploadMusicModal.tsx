@@ -220,6 +220,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     }
     setCoverPreviewUrl(null);
     setCoverFile(null);
+    uploadProgress.reset();
     setFormData({
       producerName: "", bio: "", primaryGenres: [], moodTags: "",
       instagram: "", tiktok: "", youtube: "", website: "",
