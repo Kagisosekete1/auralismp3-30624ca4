@@ -15,9 +15,11 @@ export interface AudioTrack {
 const STORAGE_KEY = "auralis_last_track";
 const PROGRESS_KEY = "auralis_last_progress";
 
-export const useAudioPlayer = (onTrackEnd?: () => void) => {
+export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => void) => {
   const onTrackEndRef = useRef(onTrackEnd);
   onTrackEndRef.current = onTrackEnd;
+  const onPreviousRef = useRef(onPreviousTrack);
+  onPreviousRef.current = onPreviousTrack;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState<AudioTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
