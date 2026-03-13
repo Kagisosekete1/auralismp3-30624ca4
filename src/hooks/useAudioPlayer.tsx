@@ -83,6 +83,12 @@ export const useAudioPlayer = (onTrackEnd?: () => void) => {
           audioRef.current.currentTime = details.seekTime;
         }
       });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        onTrackEndRef.current?.();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        // We reuse the onTrackEnd ref; Index wires handlePreviousTrack via mediaSession below
+      });
     }
   }, [currentTrack]);
 
