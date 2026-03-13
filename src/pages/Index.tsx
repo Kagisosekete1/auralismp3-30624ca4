@@ -40,6 +40,8 @@ const Index = () => {
   
   const playNextRef = useRef(playNext);
   playNextRef.current = playNext;
+  const playPreviousRef = useRef(playPrevious);
+  playPreviousRef.current = playPrevious;
   const playTrackFnRef = useRef<((track: QueueTrack) => void) | null>(null);
 
   const handleAutoNext = useCallback(() => {
@@ -49,7 +51,14 @@ const Index = () => {
     }
   }, []);
 
-  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext);
+  const handleAutoPrevious = useCallback(() => {
+    const prev = playPreviousRef.current();
+    if (prev && playTrackFnRef.current) {
+      playTrackFnRef.current(prev);
+    }
+  }, []);
+
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext, handleAutoPrevious);
   playTrackFnRef.current = playTrack;
   
   // Use session persistence for navigation state
@@ -122,9 +131,21 @@ const Index = () => {
       videoReelUrl: track.video_reel_url || track.videoReelUrl,
       duration: track.duration,
     } as QueueTrack & { videoReelUrl?: string };
-    playTrack(audioTrack);
-    addToQueue(audioTrack);
 
+    // Build full queue from all tracks, starting at the selected one
+    const allQueueTracks = tracks.map(buildQueueTrack);
+    const startIndex = allQueueTracks.findIndex(t => t.id === track.id);
+    if (startIndex !== -1 && allQueueTracks.length > 1) {
+      const orderedTracks = shuffleEnabled
+        ? [allQueueTracks[startIndex], ...allQueueTracks.filter((_, i) => i !== startIndex).sort(() => Math.random() - 0.5)]
+        : allQueueTracks;
+      const playIndex = shuffleEnabled ? 0 : startIndex;
+      setQueueAndPlay(orderedTracks, playIndex);
+      playTrack(orderedTracks[playIndex]);
+    } else {
+      playTrack(audioTrack);
+      addToQueue(audioTrack);
+    }
     // Increment play count in database
     try {
       const { data: currentTrackData } = await supabase

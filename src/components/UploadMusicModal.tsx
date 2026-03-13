@@ -453,7 +453,19 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                 </motion.button>
               )}
               <motion.button
-                onClick={step < 4 ? () => setStep(step + 1) : handleSubmit}
+                onClick={step < 4 ? () => {
+                  if (step === 1) {
+                    if (!formData.producerName.trim()) { toast.error("Please enter your artist/producer name"); return; }
+                  }
+                  if (step === 2) {
+                    if (!formData.trackTitle.trim()) { toast.error("Please enter a track title"); return; }
+                    if (!formData.primaryGenre) { toast.error("Please select a primary genre"); return; }
+                  }
+                  if (step === 3) {
+                    if (!audioFile) { toast.error("Please upload an audio file"); return; }
+                  }
+                  setStep(step + 1);
+                } : handleSubmit}
                 disabled={isUploading}
                 className="flex-1 px-6 py-3 rounded-xl gradient-primary text-primary-foreground font-medium glow-primary flex items-center justify-center gap-2 disabled:opacity-50"
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

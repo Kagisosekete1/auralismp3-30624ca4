@@ -982,7 +982,32 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
             
             {step < totalSteps ? (
               <button
-                onClick={() => setStep(step + 1)}
+                onClick={() => {
+                  // Validate each step before proceeding
+                  if (step === 1) {
+                    if (!formData.title.trim()) { toast.error("Please enter a release title"); return; }
+                  }
+                  if (step === 2) {
+                    if (!formData.primaryArtist.trim()) { toast.error("Please enter a primary artist name"); return; }
+                    if (!formData.writers.trim()) { toast.error("Please enter writer name(s)"); return; }
+                  }
+                  if (step === 3) {
+                    if (!formData.primaryGenre) { toast.error("Please select a primary genre"); return; }
+                    if (!formData.compositionCopyright.trim()) { toast.error("Please enter composition copyright"); return; }
+                    if (!formData.recordingCopyright.trim()) { toast.error("Please enter recording copyright"); return; }
+                    if (!formData.recordLabel.trim()) { toast.error("Please enter a record label"); return; }
+                  }
+                  if (step === 4) {
+                    if (!formData.originallyReleased) { toast.error("Please enter an original release date"); return; }
+                  }
+                  if (step === 5) {
+                    if (trackFiles.length === 0) { toast.error("Please upload at least one audio file"); return; }
+                    // Validate track titles
+                    const emptyTitle = trackFiles.find(t => !t.title.trim());
+                    if (emptyTitle) { toast.error("Please enter a title for each track"); return; }
+                  }
+                  setStep(step + 1);
+                }}
                 className="px-6 py-3 rounded-xl gradient-primary text-primary-foreground font-medium"
               >
                 Continue
