@@ -932,6 +932,13 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   <AlertCircle className="w-5 h-5 text-primary" />
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Terms & Submit</h3>
                 </div>
+
+                {/* Upload Progress */}
+                <UploadProgressBar
+                  state={uploadProgress.state}
+                  onRetry={handleRetry}
+                  onCancel={() => { uploadProgress.reset(); setIsUploading(false); }}
+                />
                 
                 <div className="glass rounded-xl p-4 border border-border/30 mb-6">
                   <h4 className="font-medium text-foreground mb-3">By uploading to Auralis:</h4>
