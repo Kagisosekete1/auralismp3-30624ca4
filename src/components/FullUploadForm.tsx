@@ -439,6 +439,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     });
     // Clear saved form data from session storage
     clearSavedData();
+    uploadProgress.reset();
   };
 
   const inputClass = "w-full px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all text-sm";
