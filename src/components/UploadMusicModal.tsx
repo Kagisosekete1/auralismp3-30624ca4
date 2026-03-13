@@ -141,6 +141,48 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     e.target.value = "";
   };
 
+  const doUpload = useCallback(async () => {
+    if (!user || !audioFile || !formData.trackTitle) return;
+
+    setIsUploading(true);
+    uploadProgress.reset();
+    uploadProgress.setTrackInfo(0, 1);
+
+    try {
+      const result = await uploadTrack(audioFile, coverFile, {
+        title: formData.trackTitle,
+        artistName: formData.producerName || profile?.display_name || "Unknown Artist",
+        genre: formData.primaryGenre,
+        bpm: formData.bpm ? parseInt(formData.bpm) : undefined,
+        key: formData.key || undefined,
+        isExplicit: formData.explicit,
+        version: formData.version,
+        moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
+      }, {
+        onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
+        onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
+        onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
+        onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
+        onSaving: () => uploadProgress.setPhase("saving"),
+      });
+
+      if (result) {
+        uploadProgress.complete();
+        toast.success("Track uploaded successfully! 🎉");
+        onSuccess?.();
+        setTimeout(() => {
+          resetForm();
+          uploadProgress.reset();
+          onClose();
+        }, 1500);
+      }
+    } catch (error: any) {
+      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user, audioFile, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to upload music");
@@ -162,32 +204,13 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
       return;
     }
 
-    setIsUploading(true);
-
-    try {
-      const result = await uploadTrack(audioFile, coverFile, {
-        title: formData.trackTitle,
-        artistName: formData.producerName || profile?.display_name || "Unknown Artist",
-        genre: formData.primaryGenre,
-        bpm: formData.bpm ? parseInt(formData.bpm) : undefined,
-        key: formData.key || undefined,
-        isExplicit: formData.explicit,
-        version: formData.version,
-        moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
-      });
-
-      if (result) {
-        toast.success("Track uploaded successfully! 🎉");
-        onSuccess?.();
-        resetForm();
-        onClose();
-      }
-    } catch (error) {
-      toast.error("Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
+    await doUpload();
   };
+
+  const handleRetry = useCallback(() => {
+    uploadProgress.reset();
+    doUpload();
+  }, [doUpload, uploadProgress]);
 
   const resetForm = () => {
     setStep(1);
