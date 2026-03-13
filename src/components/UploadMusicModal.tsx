@@ -439,6 +439,14 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
               {step === 4 && (
                 <>
                   <h3 className="text-lg font-display font-bold text-foreground">Rights & Agreements</h3>
+                  
+                  {/* Upload Progress */}
+                  <UploadProgressBar 
+                    state={uploadProgress.state} 
+                    onRetry={handleRetry}
+                    onCancel={() => { uploadProgress.reset(); setIsUploading(false); }}
+                  />
+                  
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
                       <button onClick={() => updateField("ownsRights", !formData.ownsRights)}
