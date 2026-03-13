@@ -4,6 +4,8 @@ import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image, Trash2 } fr
 import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import UploadProgressBar from "@/components/UploadProgressBar";
 
 const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
 const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
