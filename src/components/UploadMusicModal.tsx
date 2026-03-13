@@ -1,9 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, Music2, Video, Check, Loader2, FileAudio, Image, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import UploadProgressBar from "@/components/UploadProgressBar";
 
 const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
 const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
@@ -26,6 +28,8 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
   const [isUploading, setIsUploading] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const uploadProgress = useUploadProgress();
+  const lastSubmitDataRef = useRef<any>(null);
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -137,6 +141,48 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     e.target.value = "";
   };
 
+  const doUpload = useCallback(async () => {
+    if (!user || !audioFile || !formData.trackTitle) return;
+
+    setIsUploading(true);
+    uploadProgress.reset();
+    uploadProgress.setTrackInfo(0, 1);
+
+    try {
+      const result = await uploadTrack(audioFile, coverFile, {
+        title: formData.trackTitle,
+        artistName: formData.producerName || profile?.display_name || "Unknown Artist",
+        genre: formData.primaryGenre,
+        bpm: formData.bpm ? parseInt(formData.bpm) : undefined,
+        key: formData.key || undefined,
+        isExplicit: formData.explicit,
+        version: formData.version,
+        moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
+      }, {
+        onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
+        onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
+        onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
+        onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
+        onSaving: () => uploadProgress.setPhase("saving"),
+      });
+
+      if (result) {
+        uploadProgress.complete();
+        toast.success("Track uploaded successfully! 🎉");
+        onSuccess?.();
+        setTimeout(() => {
+          resetForm();
+          uploadProgress.reset();
+          onClose();
+        }, 1500);
+      }
+    } catch (error: any) {
+      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user, audioFile, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to upload music");
@@ -158,32 +204,13 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
       return;
     }
 
-    setIsUploading(true);
-
-    try {
-      const result = await uploadTrack(audioFile, coverFile, {
-        title: formData.trackTitle,
-        artistName: formData.producerName || profile?.display_name || "Unknown Artist",
-        genre: formData.primaryGenre,
-        bpm: formData.bpm ? parseInt(formData.bpm) : undefined,
-        key: formData.key || undefined,
-        isExplicit: formData.explicit,
-        version: formData.version,
-        moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
-      });
-
-      if (result) {
-        toast.success("Track uploaded successfully! 🎉");
-        onSuccess?.();
-        resetForm();
-        onClose();
-      }
-    } catch (error) {
-      toast.error("Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
+    await doUpload();
   };
+
+  const handleRetry = useCallback(() => {
+    uploadProgress.reset();
+    doUpload();
+  }, [doUpload, uploadProgress]);
 
   const resetForm = () => {
     setStep(1);
@@ -193,6 +220,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     }
     setCoverPreviewUrl(null);
     setCoverFile(null);
+    uploadProgress.reset();
     setFormData({
       producerName: "", bio: "", primaryGenres: [], moodTags: "",
       instagram: "", tiktok: "", youtube: "", website: "",
@@ -411,6 +439,14 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
               {step === 4 && (
                 <>
                   <h3 className="text-lg font-display font-bold text-foreground">Rights & Agreements</h3>
+                  
+                  {/* Upload Progress */}
+                  <UploadProgressBar 
+                    state={uploadProgress.state} 
+                    onRetry={handleRetry}
+                    onCancel={() => { uploadProgress.reset(); setIsUploading(false); }}
+                  />
+                  
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
                       <button onClick={() => updateField("ownsRights", !formData.ownsRights)}

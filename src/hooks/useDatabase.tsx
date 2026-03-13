@@ -233,7 +233,7 @@ export const useDatabase = () => {
     }
   };
 
-  // Upload track
+  // Upload track with optional progress callbacks
   const uploadTrack = async (
     audioFile: File,
     coverFile: File | null,
@@ -246,45 +246,48 @@ export const useDatabase = () => {
       isExplicit: boolean;
       version: string;
       moodTags?: string[];
+    },
+    callbacks?: {
+      onAudioStart?: () => void;
+      onAudioProgress?: (percent: number) => void;
+      onCoverStart?: () => void;
+      onCoverProgress?: (percent: number) => void;
+      onSaving?: () => void;
     }
   ) => {
     if (!user) return null;
 
     try {
       // Upload audio file
+      callbacks?.onAudioStart?.();
       const audioExt = audioFile.name.split(".").pop();
       const audioPath = `${user.id}/${Date.now()}.${audioExt}`;
       
-      const { error: audioError } = await supabase.storage
-        .from("audio")
-        .upload(audioPath, audioFile);
-
-      if (audioError) throw audioError;
-
-      const { data: audioUrlData } = supabase.storage
-        .from("audio")
-        .getPublicUrl(audioPath);
+      // Use XMLHttpRequest for progress tracking
+      const audioPublicUrl = await uploadWithProgress(
+        "audio",
+        audioPath,
+        audioFile,
+        callbacks?.onAudioProgress
+      );
 
       // Upload cover if provided
       let coverUrl: string | null = null;
       if (coverFile) {
+        callbacks?.onCoverStart?.();
         const coverExt = coverFile.name.split(".").pop();
-        const coverPath = `${user.id}/${Date.now()}.${coverExt}`;
+        const coverPath = `${user.id}/${Date.now()}-cover.${coverExt}`;
         
-        const { error: coverError } = await supabase.storage
-          .from("covers")
-          .upload(coverPath, coverFile);
-
-        if (coverError) throw coverError;
-
-        const { data: coverUrlData } = supabase.storage
-          .from("covers")
-          .getPublicUrl(coverPath);
-        
-        coverUrl = coverUrlData.publicUrl;
+        coverUrl = await uploadWithProgress(
+          "covers",
+          coverPath,
+          coverFile,
+          callbacks?.onCoverProgress
+        );
       }
 
       // Generate unique ISRC code
+      callbacks?.onSaving?.();
       const isrcCode = await generateISRC();
 
       // Create track record
@@ -297,13 +300,13 @@ export const useDatabase = () => {
           genre: trackData.genre,
           bpm: trackData.bpm,
           key: trackData.key,
-          audio_url: audioUrlData.publicUrl,
+          audio_url: audioPublicUrl,
           cover_url: coverUrl,
           is_explicit: trackData.isExplicit,
           version: trackData.version,
           mood_tags: trackData.moodTags,
           isrc_code: isrcCode,
-          is_approved: true, // Auto-approve for now
+          is_approved: true,
           status: "live",
         })
         .select()
@@ -315,9 +318,49 @@ export const useDatabase = () => {
       return data;
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload track");
-      return null;
+      throw error; // Re-throw so callers can handle retry
     }
+  };
+
+  // Helper: upload file with XHR progress tracking
+  const uploadWithProgress = async (
+    bucket: string,
+    path: string,
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const token = supabase.auth.getSession().then(s => s.data.session?.access_token || anonKey);
+
+      token.then(accessToken => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${supabaseUrl}/storage/v1/object/${bucket}/${path}`);
+        xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+        xhr.setRequestHeader("x-upsert", "true");
+
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            onProgress?.(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+            resolve(data.publicUrl);
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+          }
+        });
+
+        xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+        xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+
+        xhr.send(file);
+      }).catch(reject);
+    });
   };
 
   // Update profile

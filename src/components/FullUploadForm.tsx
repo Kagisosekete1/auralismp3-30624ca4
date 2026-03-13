@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Upload, Music2, Check, Loader2, FileAudio, Image, Calendar, 
@@ -10,6 +10,8 @@ import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import UploadProgressBar from "@/components/UploadProgressBar";
 
 const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
 const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
@@ -52,6 +54,7 @@ const getInitialFormData = () => {
 const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => {
   const { user } = useAuth();
   const { profile, uploadTrack } = useDatabase();
+  const uploadProgress = useUploadProgress();
   const [step, setStep] = useState(() => {
     const saved = getInitialFormData();
     return saved?.step || 1;
@@ -307,6 +310,54 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     e.target.value = "";
   };
 
+  const doUpload = useCallback(async () => {
+    if (!user) return;
+
+    setIsUploading(true);
+    uploadProgress.reset();
+    uploadProgress.setTrackInfo(0, trackFiles.length);
+
+    try {
+      for (let i = 0; i < trackFiles.length; i++) {
+        const track = trackFiles[i];
+        uploadProgress.setTrackInfo(i, trackFiles.length);
+
+        await uploadTrack(track.file, coverFile, {
+          title: trackFiles.length === 1 ? formData.title : track.title,
+          artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
+          genre: formData.primaryGenre,
+          isExplicit: formData.isExplicit,
+          version: formData.version.toLowerCase(),
+          moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
+        }, {
+          onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
+          onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
+          onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
+          onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
+          onSaving: () => uploadProgress.setPhase("saving"),
+        });
+      }
+
+      uploadProgress.complete();
+      toast.success(`${formData.releaseType === "single" ? "Track" : formData.releaseType.toUpperCase()} submitted successfully! 🎉`);
+      onSuccess?.();
+      setTimeout(() => {
+        resetForm();
+        uploadProgress.reset();
+        onClose();
+      }, 1500);
+    } catch (error: any) {
+      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user, trackFiles, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+
+  const handleRetry = useCallback(() => {
+    uploadProgress.reset();
+    doUpload();
+  }, [doUpload, uploadProgress]);
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to upload music");
@@ -333,7 +384,6 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    // Validate track count for release type
     if (formData.releaseType === "single" && trackFiles.length > 1) {
       toast.error("Singles can only have 1 track");
       return;
@@ -349,30 +399,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    setIsUploading(true);
-
-    try {
-      // Upload each track
-      for (const track of trackFiles) {
-        await uploadTrack(track.file, coverFile, {
-          title: trackFiles.length === 1 ? formData.title : track.title,
-          artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
-          genre: formData.primaryGenre,
-          isExplicit: formData.isExplicit,
-          version: formData.version.toLowerCase(),
-          moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
-        });
-      }
-
-      toast.success(`${formData.releaseType === "single" ? "Track" : formData.releaseType.toUpperCase()} submitted successfully! 🎉`);
-      onSuccess?.();
-      resetForm();
-      onClose();
-    } catch (error) {
-      toast.error("Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
+    await doUpload();
   };
 
   const resetForm = () => {
@@ -412,6 +439,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     });
     // Clear saved form data from session storage
     clearSavedData();
+    uploadProgress.reset();
   };
 
   const inputClass = "w-full px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all text-sm";
@@ -905,6 +933,13 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   <AlertCircle className="w-5 h-5 text-primary" />
                   <h3 className="text-lg font-display font-bold text-foreground">Upload Terms & Submit</h3>
                 </div>
+
+                {/* Upload Progress */}
+                <UploadProgressBar
+                  state={uploadProgress.state}
+                  onRetry={handleRetry}
+                  onCancel={() => { uploadProgress.reset(); setIsUploading(false); }}
+                />
                 
                 <div className="glass rounded-xl p-4 border border-border/30 mb-6">
                   <h4 className="font-medium text-foreground mb-3">By uploading to Auralis:</h4>
