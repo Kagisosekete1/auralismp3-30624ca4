@@ -40,6 +40,8 @@ const Index = () => {
   
   const playNextRef = useRef(playNext);
   playNextRef.current = playNext;
+  const playPreviousRef = useRef(playPrevious);
+  playPreviousRef.current = playPrevious;
   const playTrackFnRef = useRef<((track: QueueTrack) => void) | null>(null);
 
   const handleAutoNext = useCallback(() => {
@@ -49,7 +51,14 @@ const Index = () => {
     }
   }, []);
 
-  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext, handlePreviousTrack);
+  const handleAutoPrevious = useCallback(() => {
+    const prev = playPreviousRef.current();
+    if (prev && playTrackFnRef.current) {
+      playTrackFnRef.current(prev);
+    }
+  }, []);
+
+  const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext, handleAutoPrevious);
   playTrackFnRef.current = playTrack;
   
   // Use session persistence for navigation state
