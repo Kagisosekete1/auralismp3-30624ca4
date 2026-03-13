@@ -310,6 +310,54 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     e.target.value = "";
   };
 
+  const doUpload = useCallback(async () => {
+    if (!user) return;
+
+    setIsUploading(true);
+    uploadProgress.reset();
+    uploadProgress.setTrackInfo(0, trackFiles.length);
+
+    try {
+      for (let i = 0; i < trackFiles.length; i++) {
+        const track = trackFiles[i];
+        uploadProgress.setTrackInfo(i, trackFiles.length);
+
+        await uploadTrack(track.file, coverFile, {
+          title: trackFiles.length === 1 ? formData.title : track.title,
+          artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
+          genre: formData.primaryGenre,
+          isExplicit: formData.isExplicit,
+          version: formData.version.toLowerCase(),
+          moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
+        }, {
+          onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
+          onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
+          onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
+          onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
+          onSaving: () => uploadProgress.setPhase("saving"),
+        });
+      }
+
+      uploadProgress.complete();
+      toast.success(`${formData.releaseType === "single" ? "Track" : formData.releaseType.toUpperCase()} submitted successfully! 🎉`);
+      onSuccess?.();
+      setTimeout(() => {
+        resetForm();
+        uploadProgress.reset();
+        onClose();
+      }, 1500);
+    } catch (error: any) {
+      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user, trackFiles, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+
+  const handleRetry = useCallback(() => {
+    uploadProgress.reset();
+    doUpload();
+  }, [doUpload, uploadProgress]);
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to upload music");
@@ -336,7 +384,6 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    // Validate track count for release type
     if (formData.releaseType === "single" && trackFiles.length > 1) {
       toast.error("Singles can only have 1 track");
       return;
@@ -352,30 +399,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
-    setIsUploading(true);
-
-    try {
-      // Upload each track
-      for (const track of trackFiles) {
-        await uploadTrack(track.file, coverFile, {
-          title: trackFiles.length === 1 ? formData.title : track.title,
-          artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
-          genre: formData.primaryGenre,
-          isExplicit: formData.isExplicit,
-          version: formData.version.toLowerCase(),
-          moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
-        });
-      }
-
-      toast.success(`${formData.releaseType === "single" ? "Track" : formData.releaseType.toUpperCase()} submitted successfully! 🎉`);
-      onSuccess?.();
-      resetForm();
-      onClose();
-    } catch (error) {
-      toast.error("Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
+    await doUpload();
   };
 
   const resetForm = () => {
