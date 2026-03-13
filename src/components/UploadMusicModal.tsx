@@ -28,6 +28,8 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
   const [isUploading, setIsUploading] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const uploadProgress = useUploadProgress();
+  const lastSubmitDataRef = useRef<any>(null);
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
