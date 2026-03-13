@@ -54,6 +54,7 @@ const getInitialFormData = () => {
 const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => {
   const { user } = useAuth();
   const { profile, uploadTrack } = useDatabase();
+  const uploadProgress = useUploadProgress();
   const [step, setStep] = useState(() => {
     const saved = getInitialFormData();
     return saved?.step || 1;
