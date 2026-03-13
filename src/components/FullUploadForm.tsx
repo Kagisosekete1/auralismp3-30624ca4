@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Upload, Music2, Check, Loader2, FileAudio, Image, Calendar, 
@@ -10,6 +10,8 @@ import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import UploadProgressBar from "@/components/UploadProgressBar";
 
 const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
 const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
