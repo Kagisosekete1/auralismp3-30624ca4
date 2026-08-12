@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Music2, Mic2, Play, Clock } from "lucide-react";
+import { Search, X, Music2, Mic2, Play, Clock, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Track {
   id: string;
@@ -9,6 +10,13 @@ interface Track {
   audio_url: string;
   cover_url?: string;
   genre?: string;
+  user_id?: string;
+}
+
+interface ArtistResult {
+  user_id: string;
+  name: string;
+  avatar_url?: string;
 }
 
 interface SearchModalProps {
@@ -17,11 +25,16 @@ interface SearchModalProps {
   tracks: Track[];
   onPlayTrack: (track: Track) => void;
   onNavigate?: (section: string) => void;
+  onSelectArtist?: (artistUserId: string) => void;
 }
 
-const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: SearchModalProps) => {
+const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist }: SearchModalProps) => {
   const [query, setQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [remoteTracks, setRemoteTracks] = useState<Track[]>([]);
+  const [remoteArtists, setRemoteArtists] = useState<ArtistResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const reqId = useRef(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("auralis-recent-searches");
@@ -33,27 +46,87 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: Searc
   useEffect(() => {
     if (isOpen) {
       setQuery("");
+      setRemoteTracks([]);
+      setRemoteArtists([]);
     }
   }, [isOpen]);
 
+  // Live search across every uploaded track + artist in the catalog
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) {
+      setRemoteTracks([]);
+      setRemoteArtists([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const id = ++reqId.current;
+    const timer = setTimeout(async () => {
+      const pattern = `%${term}%`;
+      const [trackRes, artistRes] = await Promise.all([
+        supabase
+          .from("tracks")
+          .select("id, title, artist_name, audio_url, cover_url, genre, user_id")
+          .or(`title.ilike.${pattern},artist_name.ilike.${pattern},genre.ilike.${pattern},album.ilike.${pattern}`)
+          .order("play_count", { ascending: false })
+          .limit(25),
+        supabase
+          .from("profiles")
+          .select("user_id, artist_name, display_name, avatar_url")
+          .or(`artist_name.ilike.${pattern},display_name.ilike.${pattern}`)
+          .limit(10),
+      ]);
+
+      if (id !== reqId.current) return;
+
+      setRemoteTracks((trackRes.data as Track[]) || []);
+      setRemoteArtists(
+        (artistRes.data || []).map((p: any) => ({
+          user_id: p.user_id,
+          name: p.artist_name || p.display_name || "Unknown artist",
+          avatar_url: p.avatar_url || undefined,
+        }))
+      );
+      setSearching(false);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   const results = useMemo(() => {
-    if (!query.trim()) return { tracks: [], artists: [] };
+    if (!query.trim()) return { tracks: [], artists: [] as ArtistResult[] };
 
     const lower = query.toLowerCase();
-    
-    const matchedTracks = tracks.filter(t => 
-      t.title.toLowerCase().includes(lower) || 
-      t.artist_name.toLowerCase().includes(lower) ||
-      (t.genre && t.genre.toLowerCase().includes(lower))
+
+    const localMatches = tracks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(lower) ||
+        t.artist_name.toLowerCase().includes(lower) ||
+        (t.genre && t.genre.toLowerCase().includes(lower))
     );
 
-    const artistNames = [...new Set(tracks.map(t => t.artist_name))];
-    const matchedArtists = artistNames.filter(a => 
-      a.toLowerCase().includes(lower)
-    );
+    const merged: Track[] = [];
+    const seen = new Set<string>();
+    for (const t of [...localMatches, ...remoteTracks]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      merged.push(t);
+    }
 
-    return { tracks: matchedTracks.slice(0, 10), artists: matchedArtists.slice(0, 5) };
-  }, [query, tracks]);
+    const artistMap = new Map<string, ArtistResult>();
+    for (const a of remoteArtists) artistMap.set(a.name.toLowerCase(), a);
+    for (const t of merged) {
+      const key = t.artist_name.toLowerCase();
+      if (!artistMap.has(key) && key.includes(lower)) {
+        artistMap.set(key, { user_id: t.user_id || "", name: t.artist_name });
+      }
+    }
+
+    return { tracks: merged.slice(0, 20), artists: [...artistMap.values()].slice(0, 6) };
+  }, [query, tracks, remoteTracks, remoteArtists]);
+
 
   const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
