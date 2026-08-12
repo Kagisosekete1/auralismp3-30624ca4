@@ -30,6 +30,10 @@ interface SearchModalProps {
 
 const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist }: SearchModalProps) => {
   const [query, setQuery] = useState("");
+  const [musicFirst, setMusicFirst] = useState(
+    () => localStorage.getItem("auralis-search-music-first") !== "false"
+  );
+
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [remoteTracks, setRemoteTracks] = useState<Track[]>([]);
   const [remoteArtists, setRemoteArtists] = useState<ArtistResult[]>([]);
