@@ -328,6 +328,7 @@ const Index = () => {
         </div>
       </div>
 
+      <UploadQueuePanel onUploaded={refetchTracks} />
       <NowPlayingBar
         currentTrack={nowPlayingTrack}
         isPlaying={isPlaying}
