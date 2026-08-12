@@ -278,10 +278,20 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
 
                   {results.tracks.length === 0 && results.artists.length === 0 && (
                     <div className="text-center py-8">
-                      <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground">No results found for "{query}"</p>
+                      {searching ? (
+                        <>
+                          <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
+                          <p className="text-muted-foreground">Searching music…</p>
+                        </>
+                      ) : (
+                        <>
+                          <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                          <p className="text-muted-foreground">No results found for "{query}"</p>
+                        </>
+                      )}
                     </div>
                   )}
+
                 </div>
               ) : (
                 /* Recent Searches */
