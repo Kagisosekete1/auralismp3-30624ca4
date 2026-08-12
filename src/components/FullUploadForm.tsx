@@ -790,7 +790,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   
                   {/* Add Track Button */}
                   <div 
-                    onClick={() => openFilePicker(audioInputRef)}
+                    onClick={chooseAudio}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${trackFiles.length > 0 ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                   >
                     <div className="flex items-center justify-center gap-3">
@@ -856,7 +856,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
                   <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   <div 
-                    onClick={() => !coverFile && openFilePicker(coverInputRef)}
+                    onClick={() => { if (!coverFile) chooseCover(); }}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50 cursor-pointer'}`}
                   >
                     {coverFile ? (
