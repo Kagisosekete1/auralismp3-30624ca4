@@ -880,7 +880,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openFilePicker(coverInputRef);
+                              chooseCover();
                             }}
                             className="px-4 py-2 rounded-xl glass border border-border/40 text-foreground text-sm font-medium"
                           >
