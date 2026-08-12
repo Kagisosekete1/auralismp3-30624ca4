@@ -123,12 +123,10 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
   const doUpload = useCallback(async () => {
     if (!user || !audioFile || !formData.trackTitle) return;
 
-    setIsUploading(true);
-    uploadProgress.reset();
-    uploadProgress.setTrackInfo(0, 1);
-
-    try {
-      const result = await uploadTrack(audioFile, coverFile, {
+    // Hand the upload to the persistent queue: it survives reloads,
+    // retries after brief disconnects and reports progress in the panel.
+    enqueueUpload(
+      {
         title: formData.trackTitle,
         artistName: formData.producerName || profile?.display_name || "Unknown Artist",
         genre: formData.primaryGenre,
@@ -137,30 +135,18 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
         isExplicit: formData.explicit,
         version: formData.version,
         moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
-      }, {
-        onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
-        onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
-        onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
-        onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
-        onSaving: () => uploadProgress.setPhase("saving"),
-      });
+      },
+      audioFile,
+      coverFile
+    );
 
-      if (result) {
-        uploadProgress.complete();
-        toast.success("Track uploaded successfully! 🎉");
-        onSuccess?.();
-        setTimeout(() => {
-          resetForm();
-          uploadProgress.reset();
-          onClose();
-        }, 1500);
-      }
-    } catch (error: any) {
-      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
-  }, [user, audioFile, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+    toast.success("Added to upload queue — you can keep browsing");
+    onSuccess?.();
+    resetForm();
+    uploadProgress.reset();
+    onClose();
+  }, [user, audioFile, coverFile, formData, profile, onSuccess, onClose]);
+
 
   const handleSubmit = async () => {
     if (!user) {
