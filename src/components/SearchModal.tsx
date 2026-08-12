@@ -107,6 +107,20 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
         (t.genre && t.genre.toLowerCase().includes(lower))
     );
 
+    const score = (t: Track) => {
+      const title = t.title.toLowerCase();
+      const artist = t.artist_name.toLowerCase();
+      let s = 0;
+      if (title === lower) s += 100;
+      else if (title.startsWith(lower)) s += 70;
+      else if (title.includes(lower)) s += 45;
+      if (artist === lower) s += 40;
+      else if (artist.startsWith(lower)) s += 25;
+      else if (artist.includes(lower)) s += 15;
+      if (t.genre && t.genre.toLowerCase().includes(lower)) s += 5;
+      return s;
+    };
+
     const merged: Track[] = [];
     const seen = new Set<string>();
     for (const t of [...localMatches, ...remoteTracks]) {
@@ -114,6 +128,8 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
       seen.add(t.id);
       merged.push(t);
     }
+    merged.sort((a, b) => score(b) - score(a));
+
 
     const artistMap = new Map<string, ArtistResult>();
     for (const a of remoteArtists) artistMap.set(a.name.toLowerCase(), a);
