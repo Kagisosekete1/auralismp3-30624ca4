@@ -31,6 +31,7 @@ import { useDatabase } from "@/hooks/useDatabase";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useQueue, type QueueTrack } from "@/hooks/useQueue";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
+import UploadQueuePanel from "@/components/UploadQueuePanel";
 
 const Index = () => {
   const navigate = useNavigate();
