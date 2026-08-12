@@ -59,45 +59,48 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     }));
   };
 
-  const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-        return;
-      }
-    } catch (error) {
-      console.warn("showPicker unavailable, falling back to click()", error);
-    }
-
-    input.click();
-  };
-
-  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No file selected");
-      return;
-    }
-    console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
-    if (!isAllowedAudio) {
+  const acceptAudio = (file: File) => {
+    if (!isAllowedAudio(file)) {
       toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
-      e.target.value = "";
       return;
     }
-
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
-      e.target.value = "";
       return;
     }
     setAudioFile(file);
     toast.success(`Audio file "${file.name}" selected`);
+  };
+
+  const acceptCover = (file: File) => {
+    if (!isAllowedImage(file)) {
+      toast.error("Please select a JPG, PNG, or WEBP image");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Cover image must be under 10MB");
+      return;
+    }
+    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+    setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
+    toast.success(`Cover art "${file.name}" selected`);
+  };
+
+  // Android-safe: opens the system Files picker (SAF) on native builds
+  const chooseAudio = async () => {
+    const file = await pickAudioFile();
+    if (file) acceptAudio(file);
+  };
+
+  const chooseCover = async () => {
+    const file = await pickImageFile();
+    if (file) acceptCover(file);
+  };
+
+  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptAudio(file);
     e.target.value = "";
   };
 
@@ -112,35 +115,10 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No cover file selected");
-      return;
-    }
-    console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
-    if (!isAllowedImage) {
-      toast.error("Please select a JPG, PNG, or WEBP image");
-      e.target.value = "";
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Cover image must be under 10MB");
-      e.target.value = "";
-      return;
-    }
-
-    if (coverPreviewUrl) {
-      URL.revokeObjectURL(coverPreviewUrl);
-    }
-
-    setCoverFile(file);
-    setCoverPreviewUrl(URL.createObjectURL(file));
-    toast.success(`Cover art "${file.name}" selected`);
+    if (file) acceptCover(file);
     e.target.value = "";
   };
+
 
   const doUpload = useCallback(async () => {
     if (!user || !audioFile || !formData.trackTitle) return;
