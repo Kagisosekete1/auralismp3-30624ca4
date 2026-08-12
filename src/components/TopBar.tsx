@@ -177,11 +177,14 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
         isOpen={showSearchModal} 
         onClose={() => setShowSearchModal(false)} 
         tracks={tracks}
+        onNavigate={(section) => onSectionChange?.(section)}
+        onSelectArtist={onSelectArtist}
         onPlayTrack={(track) => {
           onPlayTrack?.(track);
           setShowSearchModal(false);
         }}
       />
+
     </>
   );
 };
