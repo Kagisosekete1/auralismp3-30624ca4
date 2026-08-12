@@ -215,18 +215,29 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
                       <div className="space-y-2">
                         {results.artists.map((artist, i) => (
                           <motion.button
-                            key={i}
+                            key={artist.user_id || artist.name}
+                            onClick={() => {
+                              if (artist.user_id && onSelectArtist) {
+                                onSelectArtist(artist.user_id);
+                                onClose();
+                              }
+                            }}
                             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-elevated/50 transition-colors text-left"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
                           >
-                            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                              <Mic2 className="w-5 h-5 text-primary-foreground" />
+                            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center overflow-hidden">
+                              {artist.avatar_url ? (
+                                <img src={artist.avatar_url} alt={artist.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Mic2 className="w-5 h-5 text-primary-foreground" />
+                              )}
                             </div>
-                            <span className="font-medium text-foreground">{artist}</span>
+                            <span className="font-medium text-foreground">{artist.name}</span>
                           </motion.button>
                         ))}
+
                       </div>
                     </div>
                   )}
