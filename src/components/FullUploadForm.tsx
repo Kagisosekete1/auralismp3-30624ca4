@@ -271,25 +271,14 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     toast.success("Cover art removed");
   };
 
-  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No cover file selected");
-      return;
-    }
-    console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
-    if (!isAllowedImage) {
+  const acceptCoverFile = (file: File) => {
+    if (!isAllowedImage(file)) {
       toast.error("Please select a JPG, PNG, or WEBP image");
-      e.target.value = "";
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
-      e.target.value = "";
       return;
     }
 
@@ -300,8 +289,14 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     setCoverFile(file);
     setCoverPreviewUrl(URL.createObjectURL(file));
     toast.success(`Cover art "${file.name}" selected`);
+  };
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptCoverFile(file);
     e.target.value = "";
   };
+
 
   const doUpload = useCallback(async () => {
     if (!user) return;
