@@ -203,8 +203,8 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
                 )}
               </div>
 
-              {/* Quick Navigation */}
-              <div className="flex gap-2 mt-3">
+              {/* Quick Navigation + ranking toggle */}
+              <div className="flex gap-2 mt-3 flex-wrap">
                 <button
                   onClick={() => { onNavigate?.("explore"); onClose(); }}
                   className="px-3 py-1.5 rounded-lg bg-surface-elevated/50 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -217,13 +217,24 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
                 >
                   Artists
                 </button>
+                <button
+                  onClick={() => {
+                    const next = !musicFirst;
+                    setMusicFirst(next);
+                    localStorage.setItem("auralis-search-music-first", String(next));
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${musicFirst ? "gradient-primary text-primary-foreground" : "bg-surface-elevated/50 text-muted-foreground"}`}
+                >
+                  {musicFirst ? "Music first" : "Artists first"}
+                </button>
               </div>
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto">
               {/* Results */}
               {query.trim() ? (
-                <div className="p-4 space-y-6">
+                <div className={`p-4 space-y-6 flex flex-col ${musicFirst ? "flex-col-reverse gap-6 space-y-0" : ""}`}>
+
                   {/* Artists */}
                   {results.artists.length > 0 && (
                     <div>
