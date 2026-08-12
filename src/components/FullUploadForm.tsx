@@ -12,11 +12,19 @@ import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import UploadProgressBar from "@/components/UploadProgressBar";
+import {
+  pickAudioFile,
+  pickAudioFiles,
+  pickImageFile,
+  isAllowedAudio,
+  isAllowedImage,
+  AUDIO_ACCEPT,
+  IMAGE_ACCEPT,
+} from "@/lib/nativeFilePicker";
 
-const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
-const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
 const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
 
 
 interface FullUploadFormProps {
