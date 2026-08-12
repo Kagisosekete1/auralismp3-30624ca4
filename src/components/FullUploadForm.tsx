@@ -12,11 +12,19 @@ import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import UploadProgressBar from "@/components/UploadProgressBar";
+import {
+  pickAudioFile,
+  pickAudioFiles,
+  pickImageFile,
+  isAllowedAudio,
+  isAllowedImage,
+  AUDIO_ACCEPT,
+  IMAGE_ACCEPT,
+} from "@/lib/nativeFilePicker";
 
-const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
-const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
 const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
 
 
 interface FullUploadFormProps {
@@ -203,62 +211,55 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
     const input = inputRef.current;
     if (!input) return;
-
-    try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-        return;
-      }
-    } catch (error) {
-      console.warn("showPicker unavailable, falling back to click()", error);
-    }
-
     input.click();
   };
 
-  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No file selected");
-      return;
-    }
-    
-    console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
-    if (!isAllowedAudio) {
+  const acceptAudioFile = (file: File) => {
+    if (!isAllowedAudio(file)) {
       toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
-      e.target.value = "";
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
-      e.target.value = "";
       return;
     }
-    
+
     // For singles, just add the single track
     if (formData.releaseType === "single") {
-      setTrackFiles([{ id: Date.now().toString(), file, title: currentTrackTitle || formData.title || file.name.replace(/\.[^/.]+$/, "") }]);
+      setTrackFiles([{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, file, title: currentTrackTitle || formData.title || file.name.replace(/\.[^/.]+$/, "") }]);
     } else {
-      // For albums/EPs, check track limit
       if (trackFiles.length >= maxTracks) {
         toast.error(`Maximum ${maxTracks} tracks allowed.`);
-        e.target.value = "";
         return;
       }
-      setTrackFiles(prev => [...prev, { 
-        id: Date.now().toString(), 
-        file, 
-        title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "") 
+      setTrackFiles(prev => [...prev, {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        file,
+        title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "")
       }]);
       setCurrentTrackTitle("");
     }
     toast.success(`Track "${file.name}" added`);
+  };
+
+  // Android-safe: uses the system Files picker (SAF) inside the native app
+  const chooseAudio = async () => {
+    const files = formData.releaseType === "single" ? [await pickAudioFile()] : await pickAudioFiles();
+    files.filter(Boolean).forEach((f) => acceptAudioFile(f as File));
+  };
+
+  const chooseCover = async () => {
+    const file = await pickImageFile();
+    if (file) acceptCoverFile(file);
+  };
+
+  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptAudioFile(file);
     e.target.value = "";
   };
+
 
   const removeTrack = (trackId: string) => {
     setTrackFiles(prev => prev.filter(t => t.id !== trackId));
@@ -278,25 +279,14 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     toast.success("Cover art removed");
   };
 
-  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No cover file selected");
-      return;
-    }
-    console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
-    if (!isAllowedImage) {
+  const acceptCoverFile = (file: File) => {
+    if (!isAllowedImage(file)) {
       toast.error("Please select a JPG, PNG, or WEBP image");
-      e.target.value = "";
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
-      e.target.value = "";
       return;
     }
 
@@ -307,8 +297,14 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     setCoverFile(file);
     setCoverPreviewUrl(URL.createObjectURL(file));
     toast.success(`Cover art "${file.name}" selected`);
+  };
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptCoverFile(file);
     e.target.value = "";
   };
+
 
   const doUpload = useCallback(async () => {
     if (!user) return;
@@ -794,7 +790,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   
                   {/* Add Track Button */}
                   <div 
-                    onClick={() => openFilePicker(audioInputRef)}
+                    onClick={chooseAudio}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${trackFiles.length > 0 ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                   >
                     <div className="flex items-center justify-center gap-3">
@@ -860,7 +856,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
                   <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                   <div 
-                    onClick={() => !coverFile && openFilePicker(coverInputRef)}
+                    onClick={() => { if (!coverFile) chooseCover(); }}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50 cursor-pointer'}`}
                   >
                     {coverFile ? (
@@ -884,7 +880,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openFilePicker(coverInputRef);
+                              chooseCover();
                             }}
                             className="px-4 py-2 rounded-xl glass border border-border/40 text-foreground text-sm font-medium"
                           >

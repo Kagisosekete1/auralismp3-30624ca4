@@ -6,11 +6,12 @@ import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import UploadProgressBar from "@/components/UploadProgressBar";
+import { enqueueUpload } from "@/hooks/useUploadQueue";
+import { pickAudioFile, pickImageFile, isAllowedAudio, isAllowedImage, AUDIO_ACCEPT, IMAGE_ACCEPT } from "@/lib/nativeFilePicker";
 
-const AUDIO_ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,audio/*";
-const IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/*";
 const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
 
 
 interface UploadMusicModalProps {
@@ -58,45 +59,48 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
     }));
   };
 
-  const openFilePicker = (inputRef: React.RefObject<HTMLInputElement>) => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-        return;
-      }
-    } catch (error) {
-      console.warn("showPicker unavailable, falling back to click()", error);
-    }
-
-    input.click();
-  };
-
-  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No file selected");
-      return;
-    }
-    console.log("Audio file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const isAllowedAudio = file.type.startsWith("audio/") || ALLOWED_AUDIO_EXTENSIONS.includes(ext);
-    if (!isAllowedAudio) {
+  const acceptAudio = (file: File) => {
+    if (!isAllowedAudio(file)) {
       toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
-      e.target.value = "";
       return;
     }
-
     if (file.size > 100 * 1024 * 1024) {
       toast.error("File size must be under 100MB");
-      e.target.value = "";
       return;
     }
     setAudioFile(file);
     toast.success(`Audio file "${file.name}" selected`);
+  };
+
+  const acceptCover = (file: File) => {
+    if (!isAllowedImage(file)) {
+      toast.error("Please select a JPG, PNG, or WEBP image");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Cover image must be under 10MB");
+      return;
+    }
+    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+    setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
+    toast.success(`Cover art "${file.name}" selected`);
+  };
+
+  // Android-safe: opens the system Files picker (SAF) on native builds
+  const chooseAudio = async () => {
+    const file = await pickAudioFile();
+    if (file) acceptAudio(file);
+  };
+
+  const chooseCover = async () => {
+    const file = await pickImageFile();
+    if (file) acceptCover(file);
+  };
+
+  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) acceptAudio(file);
     e.target.value = "";
   };
 
@@ -111,45 +115,18 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      console.log("No cover file selected");
-      return;
-    }
-    console.log("Cover file selected:", file.name, "type:", file.type, "size:", file.size);
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const isAllowedImage = file.type.startsWith("image/") || ALLOWED_IMAGE_EXTENSIONS.includes(ext);
-    if (!isAllowedImage) {
-      toast.error("Please select a JPG, PNG, or WEBP image");
-      e.target.value = "";
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Cover image must be under 10MB");
-      e.target.value = "";
-      return;
-    }
-
-    if (coverPreviewUrl) {
-      URL.revokeObjectURL(coverPreviewUrl);
-    }
-
-    setCoverFile(file);
-    setCoverPreviewUrl(URL.createObjectURL(file));
-    toast.success(`Cover art "${file.name}" selected`);
+    if (file) acceptCover(file);
     e.target.value = "";
   };
+
 
   const doUpload = useCallback(async () => {
     if (!user || !audioFile || !formData.trackTitle) return;
 
-    setIsUploading(true);
-    uploadProgress.reset();
-    uploadProgress.setTrackInfo(0, 1);
-
-    try {
-      const result = await uploadTrack(audioFile, coverFile, {
+    // Hand the upload to the persistent queue: it survives reloads,
+    // retries after brief disconnects and reports progress in the panel.
+    enqueueUpload(
+      {
         title: formData.trackTitle,
         artistName: formData.producerName || profile?.display_name || "Unknown Artist",
         genre: formData.primaryGenre,
@@ -158,30 +135,18 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
         isExplicit: formData.explicit,
         version: formData.version,
         moodTags: formData.moodTags ? formData.moodTags.split(",").map(t => t.trim()) : undefined,
-      }, {
-        onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
-        onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
-        onCoverStart: () => uploadProgress.setPhase("uploading-cover"),
-        onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
-        onSaving: () => uploadProgress.setPhase("saving"),
-      });
+      },
+      audioFile,
+      coverFile
+    );
 
-      if (result) {
-        uploadProgress.complete();
-        toast.success("Track uploaded successfully! 🎉");
-        onSuccess?.();
-        setTimeout(() => {
-          resetForm();
-          uploadProgress.reset();
-          onClose();
-        }, 1500);
-      }
-    } catch (error: any) {
-      uploadProgress.setError(error?.message || "Upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
-  }, [user, audioFile, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+    toast.success("Added to upload queue — you can keep browsing");
+    onSuccess?.();
+    resetForm();
+    uploadProgress.reset();
+    onClose();
+  }, [user, audioFile, coverFile, formData, profile, onSuccess, onClose]);
+
 
   const handleSubmit = async () => {
     if (!user) {
@@ -377,7 +342,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                     {/* Audio File Upload */}
                     <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
-                      onClick={() => audioInputRef.current?.click()}
+                      onClick={chooseAudio}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${audioFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                     >
                       {audioFile ? (
@@ -400,7 +365,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                     {/* Cover Art Upload */}
                     <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
                     <div 
-                      onClick={() => coverInputRef.current?.click()}
+                      onClick={chooseCover}
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${coverFile ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                     >
                       {coverFile ? (

@@ -30,6 +30,10 @@ interface SearchModalProps {
 
 const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist }: SearchModalProps) => {
   const [query, setQuery] = useState("");
+  const [musicFirst, setMusicFirst] = useState(
+    () => localStorage.getItem("auralis-search-music-first") !== "false"
+  );
+
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [remoteTracks, setRemoteTracks] = useState<Track[]>([]);
   const [remoteArtists, setRemoteArtists] = useState<ArtistResult[]>([]);
@@ -107,6 +111,20 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
         (t.genre && t.genre.toLowerCase().includes(lower))
     );
 
+    const score = (t: Track) => {
+      const title = t.title.toLowerCase();
+      const artist = t.artist_name.toLowerCase();
+      let s = 0;
+      if (title === lower) s += 100;
+      else if (title.startsWith(lower)) s += 70;
+      else if (title.includes(lower)) s += 45;
+      if (artist === lower) s += 40;
+      else if (artist.startsWith(lower)) s += 25;
+      else if (artist.includes(lower)) s += 15;
+      if (t.genre && t.genre.toLowerCase().includes(lower)) s += 5;
+      return s;
+    };
+
     const merged: Track[] = [];
     const seen = new Set<string>();
     for (const t of [...localMatches, ...remoteTracks]) {
@@ -114,6 +132,8 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
       seen.add(t.id);
       merged.push(t);
     }
+    merged.sort((a, b) => score(b) - score(a));
+
 
     const artistMap = new Map<string, ArtistResult>();
     for (const a of remoteArtists) artistMap.set(a.name.toLowerCase(), a);
@@ -187,8 +207,8 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
                 )}
               </div>
 
-              {/* Quick Navigation */}
-              <div className="flex gap-2 mt-3">
+              {/* Quick Navigation + ranking toggle */}
+              <div className="flex gap-2 mt-3 flex-wrap">
                 <button
                   onClick={() => { onNavigate?.("explore"); onClose(); }}
                   className="px-3 py-1.5 rounded-lg bg-surface-elevated/50 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -201,13 +221,24 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
                 >
                   Artists
                 </button>
+                <button
+                  onClick={() => {
+                    const next = !musicFirst;
+                    setMusicFirst(next);
+                    localStorage.setItem("auralis-search-music-first", String(next));
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${musicFirst ? "gradient-primary text-primary-foreground" : "bg-surface-elevated/50 text-muted-foreground"}`}
+                >
+                  {musicFirst ? "Music first" : "Artists first"}
+                </button>
               </div>
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto">
               {/* Results */}
               {query.trim() ? (
-                <div className="p-4 space-y-6">
+                <div className={`p-4 space-y-6 flex flex-col ${musicFirst ? "flex-col-reverse gap-6 space-y-0" : ""}`}>
+
                   {/* Artists */}
                   {results.artists.length > 0 && (
                     <div>
