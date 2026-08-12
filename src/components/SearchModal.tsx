@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Music2, Mic2, Play, Clock } from "lucide-react";
+import { Search, X, Music2, Mic2, Play, Clock, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Track {
   id: string;
@@ -9,6 +10,13 @@ interface Track {
   audio_url: string;
   cover_url?: string;
   genre?: string;
+  user_id?: string;
+}
+
+interface ArtistResult {
+  user_id: string;
+  name: string;
+  avatar_url?: string;
 }
 
 interface SearchModalProps {
@@ -17,11 +25,16 @@ interface SearchModalProps {
   tracks: Track[];
   onPlayTrack: (track: Track) => void;
   onNavigate?: (section: string) => void;
+  onSelectArtist?: (artistUserId: string) => void;
 }
 
-const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: SearchModalProps) => {
+const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist }: SearchModalProps) => {
   const [query, setQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [remoteTracks, setRemoteTracks] = useState<Track[]>([]);
+  const [remoteArtists, setRemoteArtists] = useState<ArtistResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const reqId = useRef(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("auralis-recent-searches");
@@ -33,27 +46,87 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: Searc
   useEffect(() => {
     if (isOpen) {
       setQuery("");
+      setRemoteTracks([]);
+      setRemoteArtists([]);
     }
   }, [isOpen]);
 
+  // Live search across every uploaded track + artist in the catalog
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) {
+      setRemoteTracks([]);
+      setRemoteArtists([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const id = ++reqId.current;
+    const timer = setTimeout(async () => {
+      const pattern = `%${term}%`;
+      const [trackRes, artistRes] = await Promise.all([
+        supabase
+          .from("tracks")
+          .select("id, title, artist_name, audio_url, cover_url, genre, user_id")
+          .or(`title.ilike.${pattern},artist_name.ilike.${pattern},genre.ilike.${pattern},album.ilike.${pattern}`)
+          .order("play_count", { ascending: false })
+          .limit(25),
+        supabase
+          .from("profiles")
+          .select("user_id, artist_name, display_name, avatar_url")
+          .or(`artist_name.ilike.${pattern},display_name.ilike.${pattern}`)
+          .limit(10),
+      ]);
+
+      if (id !== reqId.current) return;
+
+      setRemoteTracks((trackRes.data as Track[]) || []);
+      setRemoteArtists(
+        (artistRes.data || []).map((p: any) => ({
+          user_id: p.user_id,
+          name: p.artist_name || p.display_name || "Unknown artist",
+          avatar_url: p.avatar_url || undefined,
+        }))
+      );
+      setSearching(false);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   const results = useMemo(() => {
-    if (!query.trim()) return { tracks: [], artists: [] };
+    if (!query.trim()) return { tracks: [], artists: [] as ArtistResult[] };
 
     const lower = query.toLowerCase();
-    
-    const matchedTracks = tracks.filter(t => 
-      t.title.toLowerCase().includes(lower) || 
-      t.artist_name.toLowerCase().includes(lower) ||
-      (t.genre && t.genre.toLowerCase().includes(lower))
+
+    const localMatches = tracks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(lower) ||
+        t.artist_name.toLowerCase().includes(lower) ||
+        (t.genre && t.genre.toLowerCase().includes(lower))
     );
 
-    const artistNames = [...new Set(tracks.map(t => t.artist_name))];
-    const matchedArtists = artistNames.filter(a => 
-      a.toLowerCase().includes(lower)
-    );
+    const merged: Track[] = [];
+    const seen = new Set<string>();
+    for (const t of [...localMatches, ...remoteTracks]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      merged.push(t);
+    }
 
-    return { tracks: matchedTracks.slice(0, 10), artists: matchedArtists.slice(0, 5) };
-  }, [query, tracks]);
+    const artistMap = new Map<string, ArtistResult>();
+    for (const a of remoteArtists) artistMap.set(a.name.toLowerCase(), a);
+    for (const t of merged) {
+      const key = t.artist_name.toLowerCase();
+      if (!artistMap.has(key) && key.includes(lower)) {
+        artistMap.set(key, { user_id: t.user_id || "", name: t.artist_name });
+      }
+    }
+
+    return { tracks: merged.slice(0, 20), artists: [...artistMap.values()].slice(0, 6) };
+  }, [query, tracks, remoteTracks, remoteArtists]);
+
 
   const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
@@ -142,18 +215,29 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: Searc
                       <div className="space-y-2">
                         {results.artists.map((artist, i) => (
                           <motion.button
-                            key={i}
+                            key={artist.user_id || artist.name}
+                            onClick={() => {
+                              if (artist.user_id && onSelectArtist) {
+                                onSelectArtist(artist.user_id);
+                                onClose();
+                              }
+                            }}
                             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-elevated/50 transition-colors text-left"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
                           >
-                            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                              <Mic2 className="w-5 h-5 text-primary-foreground" />
+                            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center overflow-hidden">
+                              {artist.avatar_url ? (
+                                <img src={artist.avatar_url} alt={artist.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Mic2 className="w-5 h-5 text-primary-foreground" />
+                              )}
                             </div>
-                            <span className="font-medium text-foreground">{artist}</span>
+                            <span className="font-medium text-foreground">{artist.name}</span>
                           </motion.button>
                         ))}
+
                       </div>
                     </div>
                   )}
@@ -194,10 +278,20 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate }: Searc
 
                   {results.tracks.length === 0 && results.artists.length === 0 && (
                     <div className="text-center py-8">
-                      <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground">No results found for "{query}"</p>
+                      {searching ? (
+                        <>
+                          <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
+                          <p className="text-muted-foreground">Searching music…</p>
+                        </>
+                      ) : (
+                        <>
+                          <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                          <p className="text-muted-foreground">No results found for "{query}"</p>
+                        </>
+                      )}
                     </div>
                   )}
+
                 </div>
               ) : (
                 /* Recent Searches */

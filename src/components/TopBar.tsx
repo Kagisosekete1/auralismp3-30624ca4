@@ -15,9 +15,11 @@ interface TopBarProps {
   onUploadMusic?: () => void;
   tracks?: any[];
   onPlayTrack?: (track: any) => void;
+  onSelectArtist?: (artistUserId: string) => void;
 }
 
-const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack }: TopBarProps) => {
+const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack, onSelectArtist }: TopBarProps) => {
+
   const [showSearchModal, setShowSearchModal] = useState(false);
   const isMobile = useIsMobile();
   const { profile } = useDatabase();
@@ -175,11 +177,14 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
         isOpen={showSearchModal} 
         onClose={() => setShowSearchModal(false)} 
         tracks={tracks}
+        onNavigate={(section) => onSectionChange?.(section)}
+        onSelectArtist={onSelectArtist}
         onPlayTrack={(track) => {
           onPlayTrack?.(track);
           setShowSearchModal(false);
         }}
       />
+
     </>
   );
 };

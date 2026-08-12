@@ -322,7 +322,7 @@ const Index = () => {
           <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onDeletePlaylist={handleDeletePlaylist} likedCount={likedTrackIds.length} onUploadMusic={() => setShowUploadMusic(true)} />
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} />
+          <TopBar onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onSelectArtist={handleViewArtist} />
           <div className="flex-1 overflow-y-auto pb-40 md:pb-28">{renderContent()}</div>
         </div>
       </div>
