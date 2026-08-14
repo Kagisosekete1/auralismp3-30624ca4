@@ -47,6 +47,13 @@ export const isAllowedImage = (file: File) =>
 
 type PickKind = "audio" | "image";
 
+const base64ToFile = (base64: string, name: string, type: string): File => {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], name, { type });
+};
+
 const pickNative = async (kind: PickKind, multiple: boolean): Promise<File[]> => {
   const { FilePicker } = await import("@capawesome/capacitor-file-picker");
   const result = await FilePicker.pickFiles({
@@ -55,23 +62,56 @@ const pickNative = async (kind: PickKind, multiple: boolean): Promise<File[]> =>
     readData: false,
   });
 
+  const cap = (window as any)?.Capacitor;
   const files: File[] = [];
+
   for (const picked of result.files || []) {
-    // The plugin exposes a real File on Android/iOS web view when available.
-    if ((picked as any).blob) {
-      const blob = (picked as any).blob as Blob;
-      files.push(new File([blob], picked.name, { type: picked.mimeType || blob.type }));
+    const name = picked.name || `upload-${Date.now()}`;
+    const type = picked.mimeType || (kind === "audio" ? "audio/mpeg" : "image/jpeg");
+
+    // 1) Plugin already handed us a real Blob/File (web + some iOS cases)
+    const rawBlob = (picked as any).blob as Blob | undefined;
+    if (rawBlob) {
+      files.push(new File([rawBlob], name, { type: rawBlob.type || type }));
       continue;
     }
-    if (picked.path || (picked as any).webPath) {
-      const src = (picked as any).webPath || `file://${picked.path}`;
-      const response = await fetch(src);
-      const blob = await response.blob();
-      files.push(new File([blob], picked.name, { type: picked.mimeType || blob.type }));
+
+    // 2) Native Android: a `content://`/`file://` path CANNOT be fetched directly
+    //    from the WebView. It must be converted with Capacitor.convertFileSrc,
+    //    which proxies it through the local capacitor http server.
+    const nativePath = (picked as any).path || (picked as any).webPath;
+    if (nativePath) {
+      try {
+        const src = cap?.convertFileSrc ? cap.convertFileSrc(nativePath) : nativePath;
+        const response = await fetch(src);
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const blob = await response.blob();
+        if (blob.size > 0) {
+          files.push(new File([blob], name, { type: blob.type || type }));
+          continue;
+        }
+      } catch (error) {
+        console.warn("convertFileSrc read failed, falling back to base64", error);
+      }
+    }
+
+    // 3) Last resort: ask the plugin to read the bytes for us as base64.
+    try {
+      const withData = await FilePicker.pickFiles({
+        types: kind === "audio" ? AUDIO_MIME_TYPES : IMAGE_MIME_TYPES,
+        limit: 1,
+        readData: true,
+      });
+      const d = withData.files?.[0];
+      if (d?.data) files.push(base64ToFile(d.data, d.name || name, d.mimeType || type));
+    } catch (error) {
+      console.warn("base64 fallback failed", error);
     }
   }
+
   return files;
 };
+
 
 const pickWeb = (kind: PickKind, multiple: boolean): Promise<File[]> =>
   new Promise((resolve) => {
