@@ -331,36 +331,49 @@ export const useDatabase = () => {
   ): Promise<string> => {
     return new Promise((resolve, reject) => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const token = supabase.auth.getSession().then(s => s.data.session?.access_token || anonKey);
 
-      token.then(accessToken => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${supabaseUrl}/storage/v1/object/${bucket}/${path}`);
-        xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
-        xhr.setRequestHeader("x-upsert", "true");
-
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            onProgress?.(Math.round((e.loaded / e.total) * 100));
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          const accessToken = data.session?.access_token;
+          if (!accessToken) {
+            reject(new Error("You are signed out. Sign in again and retry the upload."));
+            return;
           }
-        });
 
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-            resolve(data.publicUrl);
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
-          }
-        });
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${supabaseUrl}/storage/v1/object/${bucket}/${path}`);
+          xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+          xhr.setRequestHeader("x-upsert", "true");
+          // Required: without an explicit content-type Android WebView sends
+          // an empty type and Storage rejects the object.
+          xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+          xhr.timeout = 15 * 60 * 1000;
 
-        xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-        xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              onProgress?.(Math.round((e.loaded / e.total) * 100));
+            }
+          });
 
-        xhr.send(file);
-      }).catch(reject);
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+              resolve(pub.publicUrl);
+            } else {
+              reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText || "no response"}`));
+            }
+          });
+
+          xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+          xhr.addEventListener("timeout", () => reject(new Error("Upload timed out — check your connection")));
+          xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+
+          xhr.send(file);
+        })
+        .catch(reject);
     });
+
   };
 
   // Update profile
