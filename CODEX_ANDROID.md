@@ -34,3 +34,30 @@ Copy/paste this brief:
   Play Store distribution, file picker + audio playback working today.
 - **React Native rewrite:** weeks of work, no benefit for a streaming/upload app
   of this shape.
+
+## Mobile upload fix (Aug 2026) — what changed and why
+
+Two bugs made uploads silently fail inside the Android WebView:
+
+1. **`src/lib/nativeFilePicker.ts`** — after SAF picking, the code did
+   `fetch("file://" + path)`. Android WebView cannot fetch `file://` or
+   `content://` URIs, so it threw and the picker returned zero files (upload
+   button just did nothing). Fixed by converting the native path with
+   `Capacitor.convertFileSrc(path)` before fetching, plus a base64
+   (`readData: true`) fallback that reconstructs a real `File`.
+2. **`src/hooks/useDatabase.tsx`** (`uploadWithProgress`) — the XHR sent no
+   `Content-Type`, so Storage rejected the object; it also fell back to the
+   anon key when the session was missing, producing an opaque 403. Fixed:
+   explicit `Content-Type`, hard requirement for a signed-in access token,
+   15-minute timeout, and real error text surfaced to the retry UI.
+
+Android requirements for these to work (add to `AndroidManifest.xml`):
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+```
+
+After pulling: `npm install && npm run build && npx cap sync android`
+(the `@capawesome/capacitor-file-picker` plugin must be registered by sync).
