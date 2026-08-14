@@ -519,6 +519,42 @@ export type Database = {
         }
         Relationships: []
       }
+      songs: {
+        Row: {
+          album: string | null
+          artist: string | null
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          genre: string | null
+          id: number
+          title: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          album?: string | null
+          artist?: string | null
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          genre?: string | null
+          id?: number
+          title: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          album?: string | null
+          artist?: string | null
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          genre?: string | null
+          id?: number
+          title?: string
+          uploaded_at?: string | null
+        }
+        Relationships: []
+      }
       tracks: {
         Row: {
           album: string | null
@@ -607,6 +643,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uploaded_songs: {
+        Row: {
+          album: string | null
+          artist: string | null
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          genre: string | null
+          id: number
+          title: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          album?: string | null
+          artist?: string | null
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          genre?: string | null
+          id?: number
+          title: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          album?: string | null
+          artist?: string | null
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          genre?: string | null
+          id?: number
+          title?: string
+          uploaded_at?: string | null
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: number
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: number
+          password_hash: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: number
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
       }
     }
     Views: {
