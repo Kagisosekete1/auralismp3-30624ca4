@@ -20,6 +20,7 @@ import {
   Mic2,
   Moon,
   Music2,
+  ListPlus,
   Play,
   Radio,
   Repeat2,
@@ -67,6 +68,7 @@ interface ExplorePageProps {
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onCreatePlaylist?: () => void;
   onArtistClick?: (track: Track) => void;
   onSelectArtist?: (artistUserId: string) => void;
   onSectionChange?: (section: string) => void;
@@ -107,6 +109,7 @@ const ExplorePage = ({
   tracks = [],
   onPlayTrack,
   onAddToPlaylist,
+  onCreatePlaylist,
   onArtistClick,
   onSelectArtist,
   onSectionChange,
@@ -232,6 +235,7 @@ const ExplorePage = ({
       const { data: weeklyPlays } = await supabase
         .from("play_history")
         .select("track_id")
+        .eq("is_validated", true)
         .gte("played_at", oneWeekAgo.toISOString());
 
       if (weeklyPlays && weeklyPlays.length > 0) {
@@ -509,6 +513,16 @@ const ExplorePage = ({
                 )}
               </motion.button>
             </div>
+
+            <motion.button
+              type="button"
+              onClick={onCreatePlaylist}
+              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#00d98a]/30 bg-[#06221a] px-4 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,217,138,0.12)] transition-colors hover:bg-[#083126]"
+              whileTap={{ scale: 0.98 }}
+            >
+              <ListPlus className="h-5 w-5 text-[#00d98a]" strokeWidth={1.6} />
+              Create playlist
+            </motion.button>
 
             <div className="mt-7 flex items-center gap-3 rounded-[28px] border border-white/10 bg-white/[0.055] px-5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_45px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
               <Search className="w-6 h-6 text-white/88 flex-shrink-0" />

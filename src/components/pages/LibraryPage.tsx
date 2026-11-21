@@ -48,6 +48,7 @@ const LibraryPage = ({ playlists, likedCount, onCreatePlaylist, onSelectPlaylist
           .from("play_history")
           .select(`*, tracks(*)`)
           .eq("user_id", user.id)
+          .eq("is_validated", true)
           .order("played_at", { ascending: false })
           .limit(20);
 

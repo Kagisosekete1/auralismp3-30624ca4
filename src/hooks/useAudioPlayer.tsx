@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface AudioTrack {
   id: string;
@@ -21,6 +22,9 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
   const onPreviousRef = useRef(onPreviousTrack);
   onPreviousRef.current = onPreviousTrack;
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackSessionRef = useRef<{ id: string; trackId: string; sequence: number; pending: Promise<void> } | null>(null);
+  const sessionStartRef = useRef<Promise<{ id: string; trackId: string; sequence: number; pending: Promise<void> } | null> | null>(null);
+  const sessionGenerationRef = useRef(0);
   const [currentTrack, setCurrentTrack] = useState<AudioTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -33,6 +37,48 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
   const { profile } = useDatabase();
   
   const isPremium = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'artist';
+
+  const sendPlaybackEvent = useCallback((session: NonNullable<typeof playbackSessionRef.current>, eventType: "heartbeat" | "pause" | "resume" | "seek", positionSeconds: number) => {
+    const sequence = session.sequence++;
+    const event = session.pending.then(async () => {
+      const { error } = await (supabase as any).rpc("record_auralis_playback_event", {
+        p_session_id: session.id,
+        p_sequence: sequence,
+        p_event_type: eventType,
+        p_position_seconds: Math.max(0, positionSeconds),
+      });
+      if (error) console.error("Playback event was not recorded:", error);
+    });
+    session.pending = event.catch((error) => console.error("Playback event queue failed:", error));
+  }, []);
+
+  const ensurePlaybackSession = useCallback(async (trackId: string, positionSeconds: number) => {
+    if (!user) return null;
+    if (playbackSessionRef.current?.trackId === trackId) return playbackSessionRef.current;
+    if (sessionStartRef.current) return sessionStartRef.current;
+    const generation = sessionGenerationRef.current;
+
+    const startPromise = (async () => {
+      const { data, error } = await (supabase as any).rpc("start_auralis_playback", {
+        p_track_id: trackId,
+        p_position_seconds: Math.max(0, positionSeconds),
+      });
+      if (error) {
+        console.error("Could not start validated playback session:", error);
+        return null;
+      }
+      if (generation !== sessionGenerationRef.current) return null;
+      const id = typeof data === "string" ? data : data?.id;
+      if (!id) return null;
+      const session = { id, trackId, sequence: 1, pending: Promise.resolve() };
+      playbackSessionRef.current = session;
+      return session;
+    })();
+    sessionStartRef.current = startPromise;
+    const result = await startPromise;
+    if (sessionStartRef.current === startPromise) sessionStartRef.current = null;
+    return result;
+  }, [user?.id]);
 
   // Load last played track from localStorage on mount
   useEffect(() => {
@@ -121,12 +167,31 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
     const handleEnded = () => {
       setIsPlaying(false);
       setProgress(0);
+      const session = playbackSessionRef.current;
+      if (session) {
+        sendPlaybackEvent(session, "pause", audio.currentTime);
+        playbackSessionRef.current = null;
+      }
+      sessionGenerationRef.current += 1;
       onTrackEndRef.current?.();
+    };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => {
+      setIsPlaying(false);
+      const session = playbackSessionRef.current;
+      if (session) sendPlaybackEvent(session, "pause", audio.currentTime);
+    };
+    const handleSeeked = () => {
+      const session = playbackSessionRef.current;
+      if (session) sendPlaybackEvent(session, "seek", audio.currentTime);
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("seeked", handleSeeked);
 
     // If we have a saved track, load it
     const savedTrack = localStorage.getItem(STORAGE_KEY);
@@ -144,9 +209,37 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("seeked", handleSeeked);
       audio.pause();
     };
-  }, []);
+  }, [sendPlaybackEvent]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!isPlaying || !audio || !currentTrack) return;
+    let disposed = false;
+    let knownSessionId: string | null = null;
+
+    const sendHeartbeat = async () => {
+      if (disposed || audio.paused || audio.seeking) return;
+      const session = await ensurePlaybackSession(currentTrack.id, audio.currentTime);
+      if (!session || disposed) return;
+      if (knownSessionId !== session.id) {
+        knownSessionId = session.id;
+        if (session.sequence > 1) sendPlaybackEvent(session, "resume", audio.currentTime);
+      }
+      sendPlaybackEvent(session, "heartbeat", audio.currentTime);
+    };
+
+    void sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, 5000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [isPlaying, currentTrack?.id, ensurePlaybackSession, sendPlaybackEvent]);
 
   // Update volume
   useEffect(() => {
@@ -164,6 +257,12 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
       return;
     }
 
+    sessionGenerationRef.current += 1;
+    const oldSession = playbackSessionRef.current;
+    if (oldSession && audioRef.current) sendPlaybackEvent(oldSession, "pause", audioRef.current.currentTime);
+    playbackSessionRef.current = null;
+    sessionStartRef.current = null;
+
     // Load new track
     audioRef.current.src = track.audioUrl;
     audioRef.current.load();
@@ -173,7 +272,7 @@ export const useAudioPlayer = (onTrackEnd?: () => void, onPreviousTrack?: () => 
     audioRef.current.play().then(() => {
       setIsPlaying(true);
     }).catch(console.error);
-  }, [currentTrack]);
+  }, [currentTrack, sendPlaybackEvent]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentTrack) return;

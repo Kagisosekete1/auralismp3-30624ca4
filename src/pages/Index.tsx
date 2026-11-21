@@ -51,17 +51,15 @@ const Index = () => {
     const next = playNextRef.current();
     if (next && playTrackFnRef.current) {
       playTrackFnRef.current(next);
-      if (user) void supabase.from("play_history").insert({ user_id: user.id, track_id: next.id });
     }
-  }, [user?.id]);
+  }, []);
 
   const handleAutoPrevious = useCallback(() => {
     const prev = playPreviousRef.current();
     if (prev && playTrackFnRef.current) {
       playTrackFnRef.current(prev);
-      if (user) void supabase.from("play_history").insert({ user_id: user.id, track_id: prev.id });
     }
-  }, [user?.id]);
+  }, []);
 
   const { currentTrack, isPlaying, progress, duration, volume, isMuted, isPremium, playTrack, togglePlay, seek, setVolume, setIsMuted, formatTime } = useAudioPlayer(handleAutoNext, handleAutoPrevious);
   playTrackFnRef.current = playTrack;
@@ -154,14 +152,6 @@ const Index = () => {
       playTrack(audioTrack);
       addToQueue(audioTrack);
     }
-    recordTrackPlay(track.id);
-  };
-
-  const recordTrackPlay = (trackId: string) => {
-    if (!user) return;
-    void supabase.from("play_history").insert({ user_id: user.id, track_id: trackId }).then(({ error }) => {
-      if (error) console.error("Error recording play:", error);
-    });
   };
 
   const handleUploadRequest = () => {
@@ -197,8 +187,7 @@ const Index = () => {
   const handlePlayQueuedTrack = useCallback((track: QueueTrack | null) => {
     if (!track) return;
     playTrackFnRef.current?.(track);
-    recordTrackPlay(track.id);
-  }, [user?.id]);
+  }, []);
 
   const handleNextTrack = useCallback(() => {
     handlePlayQueuedTrack(playNext());
@@ -300,7 +289,7 @@ const Index = () => {
       case "home":
         return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={handleUploadRequest} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} onSectionChange={handleSectionChange} />;
       case "explore":
-        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} onArtistClick={handleArtistClickFromTrack} onSelectArtist={handleViewArtist} onSectionChange={handleSectionChange} userCountry={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} onCreatePlaylist={() => setShowCreatePlaylist(true)} onArtistClick={handleArtistClickFromTrack} onSelectArtist={handleViewArtist} onSectionChange={handleSectionChange} userCountry={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "genre":
         return <GenrePage />;
       case "artists":

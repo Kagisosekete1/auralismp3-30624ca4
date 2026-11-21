@@ -272,7 +272,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
     try {
       const { data: userTracks } = await supabase.from("tracks").select("id, play_count").eq("user_id", user.id);
       if (userTracks) setTotalPlays(userTracks.reduce((sum, t) => sum + (t.play_count || 0), 0));
-      const { count } = await supabase.from("play_history").select("*", { count: "exact", head: true }).eq("user_id", user.id);
+      const { count } = await supabase.from("play_history").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_validated", true);
       setTotalListenTime(Math.floor((count || 0) * 3 / 60));
     } catch {}
   };
@@ -287,6 +287,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           .from("play_history")
           .select("track_id, played_at, tracks(id, title, artist_name, cover_url, audio_url, duration, play_count, genre, user_id)")
           .eq("user_id", user.id)
+          .eq("is_validated", true)
           .order("played_at", { ascending: false })
           .limit(50);
 
@@ -351,6 +352,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       const { data: weeklyPlays } = await supabase
         .from("play_history")
         .select("track_id")
+        .eq("is_validated", true)
         .gte("played_at", oneWeekAgo.toISOString());
 
       if (weeklyPlays && weeklyPlays.length > 0) {

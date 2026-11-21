@@ -240,19 +240,25 @@ export type Database = {
       play_history: {
         Row: {
           id: string
+          is_validated: boolean
           played_at: string
+          session_id: string | null
           track_id: string
           user_id: string
         }
         Insert: {
           id?: string
+          is_validated?: boolean
           played_at?: string
+          session_id?: string | null
           track_id: string
           user_id: string
         }
         Update: {
           id?: string
+          is_validated?: boolean
           played_at?: string
+          session_id?: string | null
           track_id?: string
           user_id?: string
         }
