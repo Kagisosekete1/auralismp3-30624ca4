@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
-import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown, Shield, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { Settings, User, Bell, Lock, Palette, Volume2, Globe, CreditCard, LogOut, ChevronRight, Moon, Sun, Crown, Shield, FileText, Trash2, AlertTriangle, CheckCircle2, CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 interface SettingsPageProps {
   onSectionChange?: (section: string) => void;
@@ -17,6 +19,34 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "checking" | "connected" | "unavailable">("idle");
+  const [lastConnectionCheck, setLastConnectionCheck] = useState<Date | null>(null);
+
+  const checkServiceConnection = async () => {
+    setConnectionStatus("checking");
+    try {
+      const { error } = await supabase.from("tracks").select("id", { head: true }).limit(1);
+      setConnectionStatus(error ? "unavailable" : "connected");
+    } catch {
+      setConnectionStatus("unavailable");
+    } finally {
+      setLastConnectionCheck(new Date());
+    }
+  };
+
+  const connectionMessage = {
+    idle: "Not checked",
+    checking: "Checking connection",
+    connected: "Connected",
+    unavailable: "Could not verify connection",
+  }[connectionStatus];
+
+  const connectionDescription = {
+    idle: "Music service status",
+    checking: "Contacting the music service…",
+    connected: "The music service is reachable.",
+    unavailable: "Check your connection or sign in again, then retry.",
+  }[connectionStatus];
 
   const handleLogout = async () => {
     await signOut();
@@ -177,6 +207,44 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
             </div>
           </motion.section>
         ))}
+
+        <motion.section variants={containerVariants} initial="hidden" animate="visible">
+          <h2 className="text-lg md:text-xl font-display font-bold text-foreground mb-4">Connection</h2>
+          <div className="glass rounded-lg border border-border/30 p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-surface-elevated/50 flex items-center justify-center flex-shrink-0">
+                {connectionStatus === "checking" ? (
+                  <LoaderCircle className="w-5 h-5 md:w-6 md:h-6 text-primary animate-spin" aria-hidden="true" />
+                ) : connectionStatus === "connected" ? (
+                  <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-primary" aria-hidden="true" />
+                ) : connectionStatus === "unavailable" ? (
+                  <CircleAlert className="w-5 h-5 md:w-6 md:h-6 text-destructive" aria-hidden="true" />
+                ) : (
+                  <Shield className="w-5 h-5 md:w-6 md:h-6 text-primary" aria-hidden="true" />
+                )}
+              </div>
+              <div className="min-w-0" aria-live="polite">
+                <h3 className="font-medium text-foreground text-sm md:text-base">{connectionMessage}</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">{connectionDescription}</p>
+                {lastConnectionCheck && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last checked {lastConnectionCheck.toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto shrink-0"
+              onClick={checkServiceConnection}
+              disabled={connectionStatus === "checking"}
+            >
+              {connectionStatus === "checking" ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+              {connectionStatus === "unavailable" ? "Retry check" : "Check connection"}
+            </Button>
+          </div>
+        </motion.section>
 
         {/* Toggle Settings */}
         <motion.section variants={containerVariants} initial="hidden" animate="visible">
