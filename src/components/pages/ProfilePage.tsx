@@ -239,11 +239,11 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
     logo.src = auralisWordmark;
     try {
       await logo.decode();
-      const maxWidth = 300;
-      const scale = Math.min(maxWidth / logo.naturalWidth, 90 / logo.naturalHeight);
+      const maxWidth = 360;
+      const scale = Math.min(maxWidth / logo.naturalWidth, 150 / logo.naturalHeight);
       const width = logo.naturalWidth * scale;
       const height = logo.naturalHeight * scale;
-      context.drawImage(logo, (1000 - width) / 2, 670, width, height);
+      context.drawImage(logo, (1000 - width) / 2, 655, width, height);
     } catch {
       context.fillStyle = "#00d98a";
       context.font = "700 32px Arial";
