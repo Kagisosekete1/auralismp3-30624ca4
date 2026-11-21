@@ -7,6 +7,7 @@ interface NowPlayingTrack {
   id: string;
   title: string;
   artist: string;
+  artistUserId?: string;
   coverUrl?: string;
   duration?: number;
 }
@@ -20,6 +21,7 @@ interface QueueModalProps {
   onRemoveFromQueue: (trackId: string) => void;
   onClearQueue: () => void;
   history: QueueTrack[];
+  onViewArtist?: (artistUserId: string) => void;
 }
 
 const QueueModal = ({ 
@@ -30,7 +32,8 @@ const QueueModal = ({
   onPlayTrack, 
   onRemoveFromQueue, 
   onClearQueue,
-  history 
+  history,
+  onViewArtist,
 }: QueueModalProps) => {
   const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
 
@@ -108,7 +111,7 @@ const QueueModal = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground truncate">{currentTrack.title}</p>
-                  <p className="text-sm text-muted-foreground truncate">{currentTrack.artist}</p>
+                  <button type="button" onClick={() => currentTrack.artistUserId && onViewArtist?.(currentTrack.artistUserId)} className="block max-w-full truncate text-left text-sm text-muted-foreground hover:text-primary">{currentTrack.artist}</button>
                 </div>
               </div>
             </div>
@@ -143,7 +146,7 @@ const QueueModal = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground text-sm truncate">{track.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                        <button type="button" onClick={() => track.artistUserId && onViewArtist?.(track.artistUserId)} className="block max-w-full truncate text-left text-xs text-muted-foreground hover:text-primary">{track.artist}</button>
                       </div>
                       <motion.button
                         onClick={() => onRemoveFromQueue(track.id)}
@@ -183,7 +186,7 @@ const QueueModal = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground text-sm truncate">{track.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); if (track.artistUserId) onViewArtist?.(track.artistUserId); }} className="block max-w-full truncate text-left text-xs text-muted-foreground hover:text-primary">{track.artist}</button>
                       </div>
                     </motion.div>
                   ))}

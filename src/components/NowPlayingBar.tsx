@@ -7,6 +7,7 @@ interface NowPlayingTrack {
   id: string;
   title: string;
   artist: string;
+  artistUserId?: string;
   coverUrl?: string;
   videoReelUrl?: string;
   duration?: number;
@@ -34,6 +35,7 @@ interface NowPlayingBarProps {
   repeatMode?: "off" | "all" | "one";
   onShowQueue?: () => void;
   onTrackClick?: () => void;
+  onArtistClick?: (artistUserId?: string) => void;
   isPremium?: boolean;
 }
 
@@ -66,6 +68,7 @@ const NowPlayingBar = ({
   onNext,
   onPrevious,
   onTrackClick,
+  onArtistClick,
   isPremium = false,
 }: NowPlayingBarProps) => {
   const dragX = useMotionValue(0);
@@ -165,7 +168,9 @@ const NowPlayingBar = ({
               onClick={() => { if (!isDragging) onTrackClick?.(); }}
             >
               <MarqueeText text={currentTrack.title} className="text-sm font-semibold text-foreground" />
-              <MarqueeText text={currentTrack.artist} className="text-xs text-muted-foreground mt-0.5" />
+              <button type="button" onClick={(event) => { event.stopPropagation(); onArtistClick?.(currentTrack.artistUserId); }} className="block max-w-full text-left" aria-label={`View ${currentTrack.artist}'s artist profile`}>
+                <MarqueeText text={currentTrack.artist} className="text-xs text-muted-foreground hover:text-primary mt-0.5" />
+              </button>
             </div>
 
             {/* Action buttons — stop drag propagation */}

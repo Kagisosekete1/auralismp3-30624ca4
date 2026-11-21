@@ -30,9 +30,10 @@ export interface ProfilePageProps {
   tracks?: Track[];
   onPlayTrack?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onViewArtist?: (artistUserId: string) => void;
 }
 
-const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAddToPlaylist }: ProfilePageProps) => {
+const ProfilePage = ({ playlistCount, tracks = [], onPlayTrack, onAddToPlaylist, onViewArtist }: ProfilePageProps) => {
   const { user, signOut } = useAuth();
   const { profile, updateProfile, refetchTracks } = useDatabase();
   const [isEditing, setIsEditing] = useState(false);
@@ -41,6 +42,7 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [receivedLikes, setReceivedLikes] = useState(0);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [monthlyListeners, setMonthlyListeners] = useState<number | null>(null);
   const [returningListeners, setReturningListeners] = useState(0);
@@ -114,7 +116,19 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
       setFollowingCount(following || 0);
     };
     
-    fetchCounts();
+    const refreshReceivedLikes = async () => {
+      const { data } = await supabase.from("tracks").select("like_count").eq("user_id", user.id);
+      setReceivedLikes((data || []).reduce((sum, track) => sum + (track.like_count || 0), 0));
+    };
+    void fetchCounts();
+    void refreshReceivedLikes();
+    const channel = supabase.channel(`profile-social-counts-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "follows", filter: `following_id=eq.${user.id}` }, () => { void fetchCounts(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "follows", filter: `follower_id=eq.${user.id}` }, () => { void fetchCounts(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "liked_tracks" }, refreshReceivedLikes)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tracks", filter: `user_id=eq.${user.id}` }, refreshReceivedLikes)
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
   }, [user]);
 
   const userTracks = tracks.filter(t => t.artist_name === profile?.display_name || t.artist_name === profile?.artist_name);
@@ -406,7 +420,7 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
               <span>•</span>
               <span>{followersCount} Followers</span>
               <span>•</span>
-              <span>{likedCount} Likes</span>
+              <span>{receivedLikes.toLocaleString()} Likes</span>
             </div>
           </motion.div>
 
@@ -499,7 +513,7 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-foreground truncate">{track.title}</h3>
-                  <p className="text-sm text-muted-foreground">{track.artist_name}</p>
+                  <button type="button" onClick={() => user && onViewArtist?.(user.id)} className="block max-w-full truncate text-left text-sm text-muted-foreground hover:text-primary">{track.artist_name}</button>
                   <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                     <span>{track.play_count || 0} plays</span>
                     <span>{track.like_count || 0} likes</span>

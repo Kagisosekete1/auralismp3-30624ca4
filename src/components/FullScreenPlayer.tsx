@@ -14,6 +14,7 @@ interface FullScreenPlayerProps {
     id: string;
     title: string;
     artist: string;
+    artistUserId?: string;
     coverUrl?: string;
     videoReelUrl?: string;
     duration?: number;
@@ -38,6 +39,7 @@ interface FullScreenPlayerProps {
   repeatMode: "off" | "all" | "one";
   onShowQueue: () => void;
   isPremium: boolean;
+  onArtistClick?: (artistUserId?: string) => void;
 }
 
 const FullScreenPlayer = ({
@@ -45,7 +47,7 @@ const FullScreenPlayer = ({
   isLiked, onToggleLike, progress, duration, onSeek,
   volume, onVolumeChange, isMuted, onToggleMute, formatTime,
   onNext, onPrevious, onShuffle, onRepeat, isShuffled,
-  repeatMode, onShowQueue, isPremium,
+  repeatMode, onShowQueue, isPremium, onArtistClick,
 }: FullScreenPlayerProps) => {
   const [localVolume, setLocalVolume] = useState(volume);
 
@@ -195,9 +197,9 @@ const FullScreenPlayer = ({
                   </motion.h2>
                 </div>
                 {/* Marquee artist */}
-                <div className="overflow-hidden relative mt-0.5">
+                <button type="button" onClick={() => onArtistClick?.(currentTrack.artistUserId)} className="block max-w-full overflow-hidden text-left relative mt-0.5 pointer-events-auto" aria-label={`View ${currentTrack.artist}'s artist profile`}>
                   <motion.p
-                    className="text-base text-muted-foreground whitespace-nowrap"
+                    className="text-base text-muted-foreground whitespace-nowrap hover:text-primary"
                     animate={currentTrack.artist.length > 24 ? {
                       x: ["0%", "-50%"],
                     } : { x: 0 }}
@@ -207,7 +209,7 @@ const FullScreenPlayer = ({
                   >
                     {currentTrack.artist.length > 24 ? `${currentTrack.artist}   •   ${currentTrack.artist}` : currentTrack.artist}
                   </motion.p>
-                </div>
+                </button>
               </div>
               <motion.button
                 onClick={onToggleLike}

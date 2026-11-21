@@ -285,6 +285,8 @@ export const useDatabase = () => {
       isExplicit: boolean;
       version: string;
       moodTags?: string[];
+      albumId?: string;
+      albumTitle?: string;
     },
     callbacks?: {
       onAudioStart?: () => void;
@@ -357,6 +359,8 @@ export const useDatabase = () => {
           user_id: user.id,
           title: trackData.title,
           artist_name: trackData.artistName,
+          album: trackData.albumTitle,
+          album_id: trackData.albumId,
           genre: trackData.genre,
           bpm: trackData.bpm,
           key: trackData.key,

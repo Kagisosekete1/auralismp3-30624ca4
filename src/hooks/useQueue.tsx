@@ -4,6 +4,7 @@ export interface QueueTrack {
   id: string;
   title: string;
   artist: string;
+  artistUserId?: string;
   audioUrl: string;
   coverUrl?: string;
   duration?: number;

@@ -27,7 +27,7 @@ interface ArtistCard {
   userId: string;
   name: string;
   avatarUrl?: string;
-  totalPlays: number;
+  monthlyListeners: number;
   latestTracks: Track[];
   isFollowed: boolean;
 }
@@ -150,8 +150,8 @@ const ArtistMiniCard = ({ artist, onViewProfile, onPlayTrack, onAddToPlaylist }:
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-foreground truncate">{artist.name}</p>
-          <p className="text-[10px] text-muted-foreground">{artist.totalPlays.toLocaleString()} plays</p>
+          <button type="button" onClick={() => onViewProfile?.(artist.userId)} className="block max-w-full truncate text-left text-xs font-bold text-foreground hover:text-primary">{artist.name}</button>
+          <p className="text-[10px] text-muted-foreground">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
         <motion.button
           onClick={handleFollow}
@@ -202,6 +202,8 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
   const [topArtists, setTopArtists] = useState<ArtistCard[]>([]);
   const [userGenre, setUserGenre] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [monthlyListeners, setMonthlyListeners] = useState(0);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -211,6 +213,32 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
   };
 
   useEffect(() => { setLiveTracks(tracks); }, [tracks]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refreshUnread = async () => {
+      const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("read", false);
+      setUnreadCount(count || 0);
+    };
+    void refreshUnread();
+    const channel = supabase.channel(`home-notifications-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, refreshUnread)
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !profile?.is_artist) return;
+    const refreshListeners = async () => {
+      const { data, error } = await supabase.rpc("get_artist_monthly_listeners", { artist_user_id: user.id });
+      if (!error) setMonthlyListeners(Number(data) || 0);
+    };
+    void refreshListeners();
+    const channel = supabase.channel(`home-monthly-listeners-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "artist_listener_stats", filter: `artist_user_id=eq.${user.id}` }, refreshListeners)
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id, profile?.is_artist]);
 
   useEffect(() => {
     fetchStats();
@@ -362,10 +390,12 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           .map(([uid]) => uid);
 
         if (topUserIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, display_name, artist_name, avatar_url")
-            .in("user_id", topUserIds);
+          const [profilesResult, listenerStatsResult] = await Promise.all([
+            supabase.from("profiles").select("user_id, display_name, artist_name, avatar_url").in("user_id", topUserIds),
+            supabase.from("artist_listener_stats" as any).select("artist_user_id, monthly_listeners").in("artist_user_id", topUserIds),
+          ]);
+          const profiles = profilesResult.data;
+          const listenerStats = listenerStatsResult.data as unknown as Array<{ artist_user_id: string; monthly_listeners: number }> | null;
 
           let followedIds = new Set<string>();
           if (user) {
@@ -386,7 +416,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
                 userId: uid,
                 name: p?.artist_name || p?.display_name || ts[0]?.artist_name || "Artist",
                 avatarUrl: p?.avatar_url || undefined,
-                totalPlays: ts.reduce((s, t) => s + (t.play_count || 0), 0),
+                monthlyListeners: Number(listenerStats?.find((stats) => stats.artist_user_id === uid)?.monthly_listeners || 0),
                 latestTracks: ts.slice(0, 3),
                 isFollowed: followedIds.has(uid),
               };
@@ -426,8 +456,9 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
               <p className="text-xs font-medium text-white/55">{getGreeting()}</p>
               <h1 className="mt-0.5 truncate text-lg leading-tight font-display font-semibold text-white">{username}</h1>
             </div>
-            <button onClick={() => onSectionChange?.("notifications")} className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white backdrop-blur-xl" aria-label="Notifications">
+            <button onClick={() => onSectionChange?.("notifications")} className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center text-white" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}>
               <Bell className="h-5 w-5" />
+              {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">{unreadCount > 9 ? "9+" : unreadCount}</span>}
             </button>
           </div>
 
@@ -437,7 +468,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           </button>
 
           {featuredTrack && (
-            <button onClick={() => onPlayTrack?.(featuredTrack)} className="relative mt-6 h-[220px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/5 text-left shadow-[0_28px_80px_rgba(0,0,0,0.48)]">
+            <div role="button" tabIndex={0} onClick={() => onPlayTrack?.(featuredTrack)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onPlayTrack?.(featuredTrack); }} className="relative mt-6 h-[220px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/5 text-left shadow-[0_28px_80px_rgba(0,0,0,0.48)]">
               {featuredTrack.cover_url ? (
                 <img src={featuredTrack.cover_url} alt={featuredTrack.title} className="absolute inset-0 h-full w-full object-cover" />
               ) : (
@@ -448,13 +479,13 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
                 <span className="w-fit rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Featured</span>
                 <div>
                   <h2 className="max-w-[82%] text-[30px] leading-[0.95] font-display font-bold tracking-normal text-white">{featuredTrack.title}</h2>
-                  <p className="mt-2 text-sm font-medium text-white/72">{featuredTrack.artist_name}</p>
+                  <button onClick={(event) => { event.stopPropagation(); onArtistClick?.(featuredTrack); }} onKeyDown={(event) => event.stopPropagation()} className="mt-2 block max-w-[82%] truncate text-left text-sm font-medium text-white/72 hover:text-primary">{featuredTrack.artist_name}</button>
                   <span className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-[#08783e] shadow-lg">
                     <Play className="h-4 w-4 fill-current" /> Play Now
                   </span>
                 </div>
               </div>
-            </button>
+            </div>
           )}
 
           <div className="-mx-5 mt-5 overflow-x-auto px-5 pb-1 scrollbar-hide">
@@ -482,7 +513,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
       <div className="hidden md:flex gap-2 overflow-x-auto pb-2 px-4 md:px-8 scrollbar-hide mb-2">
         {[
           { icon: Music2, label: `${liveTracks.length} Tracks` },
-          { icon: TrendingUp, label: `${totalPlays.toLocaleString()} Plays` },
+          { icon: TrendingUp, label: profile?.is_artist ? `${monthlyListeners.toLocaleString()} Monthly listeners` : `${liveTracks.length} Tracks` },
           { icon: Clock, label: `${totalListenTime}h Listened` },
         ].map(({ icon: Icon, label }) => (
           <div key={label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full glass border border-border/30 whitespace-nowrap flex-shrink-0">
@@ -574,7 +605,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
         <div className="px-4 md:px-8 py-16 flex flex-col items-center text-center">
           <Music2 className="w-16 h-16 text-muted-foreground/40 mb-4" />
           <h3 className="text-xl font-display font-bold text-foreground mb-2">Your feed is empty</h3>
-          <p className="text-muted-foreground text-sm">Upload your first track or explore music to get started.</p>
+          <p className="text-muted-foreground text-sm">{profile?.is_artist ? "Upload your first track or explore music to get started." : "Explore the catalogue and discover your next favourite track."}</p>
         </div>
       )}
 

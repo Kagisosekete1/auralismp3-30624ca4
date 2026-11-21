@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 interface Notification {
   id: string;
-  type: "new_release" | "follow" | "like" | "system";
+  type: string;
   title: string;
   message: string;
   read: boolean;
@@ -21,9 +21,10 @@ interface NotificationsPageProps {
   onSectionChange?: (section: string) => void;
   onViewArtist?: (artistId: string) => void;
   onPlayTrack?: (track: any) => void;
+  onViewPost?: (postId: string) => void;
 }
 
-const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: NotificationsPageProps) => {
+const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack, onViewPost }: NotificationsPageProps) => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState("All");
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -199,8 +200,8 @@ const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: Notif
   const filteredNotifications = notifications.filter(notif => {
     if (activeFilter === "All") return true;
     if (activeFilter === "New Releases") return notif.type === "new_release";
-    if (activeFilter === "Follows") return notif.type === "follow";
-    if (activeFilter === "Likes") return notif.type === "like";
+    if (activeFilter === "Follows") return notif.type === "follow" || notif.type === "follower";
+    if (activeFilter === "Likes") return notif.type === "like" || notif.type === "song_like" || notif.type === "post_like";
     if (activeFilter === "System") return notif.type === "system";
     return true;
   });
@@ -243,18 +244,30 @@ const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: Notif
     // Navigate based on type
     switch (notif.type) {
       case "new_release":
-        if (notif.data) {
+        if (notif.data?.audio_url) {
           onPlayTrack?.(notif.data);
+        } else if (notif.related_id) {
+          const { data } = await supabase.from("tracks").select("*").eq("id", notif.related_id).maybeSingle();
+          if (data) onPlayTrack?.(data);
         }
         break;
       case "follow":
+      case "follower":
         if (notif.related_id) {
           onViewArtist?.(notif.related_id);
         }
         break;
       case "like":
+      case "song_like":
         onSectionChange?.("profile");
         break;
+      case "post_like":
+      case "post_comment":
+      case "comment": {
+        const postId = notif.data?.post_id || notif.related_id;
+        if (postId) onViewPost?.(postId);
+        break;
+      }
       case "system":
         onSectionChange?.("settings");
         break;
@@ -265,7 +278,9 @@ const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: Notif
     switch (type) {
       case "new_release": return Music2;
       case "follow": return User;
-      case "like": return Heart;
+      case "like":
+      case "song_like":
+      case "post_like": return Heart;
       case "system": return Settings;
       default: return Bell;
     }
@@ -274,8 +289,11 @@ const NotificationsPage = ({ onSectionChange, onViewArtist, onPlayTrack }: Notif
   const getColor = (type: string) => {
     switch (type) {
       case "new_release": return "from-primary to-accent";
-      case "follow": return "from-secondary to-primary";
-      case "like": return "from-accent to-secondary";
+      case "follow":
+      case "follower": return "from-secondary to-primary";
+      case "like":
+      case "song_like":
+      case "post_like": return "from-accent to-secondary";
       case "system": return "from-muted to-primary";
       default: return "from-primary to-secondary";
     }

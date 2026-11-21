@@ -4,6 +4,7 @@ import { useState } from "react";
 
 interface Track {
   id: string;
+  user_id?: string;
   title: string;
   artist_name: string;
   audio_url: string;
@@ -25,7 +26,7 @@ interface TrackDetailModalProps {
   onPlay: (track: Track) => void;
   isLiked: boolean;
   onToggleLike: () => void;
-  onViewArtist?: (artistName: string) => void;
+  onViewArtist?: (artistUserId: string) => void;
 }
 
 const TrackDetailModal = ({ isOpen, onClose, track, onPlay, isLiked, onToggleLike, onViewArtist }: TrackDetailModalProps) => {
@@ -114,7 +115,7 @@ const TrackDetailModal = ({ isOpen, onClose, track, onPlay, isLiked, onToggleLik
                 </div>
                 <h2 className="text-xl font-display font-bold text-white truncate">{track.title}</h2>
                 <button
-                  onClick={() => onViewArtist?.(track.artist_name)}
+                  onClick={() => track.user_id && onViewArtist?.(track.user_id)}
                   className="text-white/80 hover:text-white transition-colors"
                 >
                   {track.artist_name}
@@ -197,7 +198,7 @@ const TrackDetailModal = ({ isOpen, onClose, track, onPlay, isLiked, onToggleLik
 
               {/* View Artist */}
               <motion.button
-                onClick={() => onViewArtist?.(track.artist_name)}
+                onClick={() => track.user_id && onViewArtist?.(track.user_id)}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-surface-elevated/30 hover:bg-surface-elevated/50 transition-colors"
                 whileHover={{ scale: 1.01 }}
               >

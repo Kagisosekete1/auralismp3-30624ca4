@@ -287,10 +287,6 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
                 <p className="text-xs text-muted-foreground">Tracks</p>
               </div>
               <div className="text-center">
-                <p className="text-xl font-bold text-foreground">{profile.total_plays || 0}</p>
-                <p className="text-xs text-muted-foreground">Plays</p>
-              </div>
-              <div className="text-center">
                 <p className="text-xl font-bold text-foreground">{monthlyListeners === null ? "—" : monthlyListeners.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">Monthly listeners</p>
                 <p className="text-[10px] text-muted-foreground">{returningListeners.toLocaleString()} returned after 24 hours</p>

@@ -80,6 +80,7 @@ interface FullUploadFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  onUpgrade?: () => void;
 }
 
 const languages = [
@@ -113,7 +114,7 @@ const getInitialFormData = () => {
   return null;
 };
 
-const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => {
+const FullUploadForm = ({ isOpen, onClose, onSuccess, onUpgrade }: FullUploadFormProps) => {
   const { user } = useAuth();
   const { profile, uploadTrack } = useDatabase();
   const uploadProgress = useUploadProgress();
@@ -407,12 +408,44 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   const doUpload = useCallback(async () => {
     if (!user) return;
+    if (!profile?.is_artist) {
+      toast.error("Music uploads are available to artist accounts only.");
+      return;
+    }
+    if (formData.releaseType === "album" && !isPremium) {
+      toast.error("Full album uploads require an artist Premium plan.");
+      onUpgrade?.();
+      return;
+    }
 
     setIsUploading(true);
     uploadProgress.reset();
     uploadProgress.setTrackInfo(0, trackFiles.length);
 
+    let albumId: string | undefined;
+    const createdTracks: Array<{ id: string; audio_url: string; cover_url?: string | null }> = [];
     try {
+      if (formData.releaseType !== "single") {
+        const { data: album, error: albumError } = await supabase.from("albums").insert({
+          user_id: user.id,
+          title: formData.title,
+          artist_name: formData.primaryArtist || profile.display_name || "Unknown Artist",
+          cover_url: null,
+          primary_genre: formData.primaryGenre,
+          secondary_genre: formData.secondaryGenre || null,
+          language: formData.language,
+          release_type: formData.releaseType,
+          release_date: formData.originallyReleased,
+          is_explicit: formData.isExplicit,
+          is_compilation: formData.isCompilation,
+          has_cover_versions: formData.hasCoverVersions,
+          is_approved: true,
+          status: "live",
+          version: formData.version.toLowerCase(),
+        }).select("id").single();
+        if (albumError) throw albumError;
+        albumId = album.id;
+      }
       for (let i = 0; i < trackFiles.length; i++) {
         const track = trackFiles[i];
         uploadProgress.setTrackInfo(i, trackFiles.length);
@@ -426,6 +459,8 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
           isExplicit: formData.isExplicit,
           version: formData.version.toLowerCase(),
           moodTags: formData.featuringArtists.length > 0 ? [`feat. ${formData.featuringArtists.join(", ")}`] : undefined,
+          albumId,
+          albumTitle: albumId ? formData.title : undefined,
         }, {
           onAudioStart: () => uploadProgress.setPhase("uploading-audio"),
           onAudioProgress: (p) => uploadProgress.setAudioProgress(p),
@@ -435,6 +470,11 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
         });
         if (!savedTrack?.id || !savedTrack.audio_url) {
           throw new Error(`"${track.file.name}" was not saved to your music library. Please try again.`);
+        }
+        createdTracks.push(savedTrack);
+        if (albumId && i === 0 && savedTrack.cover_url) {
+          const { error: coverUpdateError } = await supabase.from("albums").update({ cover_url: savedTrack.cover_url }).eq("id", albumId);
+          if (coverUpdateError) throw coverUpdateError;
         }
       }
 
@@ -447,11 +487,25 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
         onClose();
       }, 1500);
     } catch (error: any) {
+      if (createdTracks.length > 0) {
+        await supabase.from("tracks").delete().in("id", createdTracks.map((track) => track.id));
+        const removeUploadedFile = async (url: string | null | undefined, bucket: "audio" | "covers") => {
+          if (!url) return;
+          const marker = `/object/public/${bucket}/`;
+          const path = decodeURIComponent(url.split(marker)[1] || "");
+          if (path) await supabase.storage.from(bucket).remove([path]);
+        };
+        await Promise.all(createdTracks.flatMap((track) => [
+          removeUploadedFile(track.audio_url, "audio"),
+          removeUploadedFile(track.cover_url, "covers"),
+        ]));
+      }
+      if (albumId) await supabase.from("albums").delete().eq("id", albumId);
       uploadProgress.setError(error?.message || "Upload failed. Please try again.");
     } finally {
       setIsUploading(false);
     }
-  }, [user, trackFiles, coverFile, formData, profile, uploadTrack, onSuccess, onClose]);
+  }, [user, trackFiles, coverFile, formData, profile, isPremium, uploadTrack, onSuccess, onClose, onUpgrade]);
 
   const handleRetry = useCallback(() => {
     uploadProgress.reset();
@@ -461,6 +515,16 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please sign in to upload music");
+      return;
+    }
+
+    if (!profile?.is_artist) {
+      toast.error("Music uploads are available to artist accounts only.");
+      return;
+    }
+    if (formData.releaseType === "album" && !isPremium) {
+      toast.error("Full album uploads require an artist Premium plan.");
+      onUpgrade?.();
       return;
     }
 
@@ -634,7 +698,14 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                       {(["single", "ep", "album"] as const).map(type => (
                         <button
                           key={type}
-                          onClick={() => updateField("releaseType", type)}
+                          onClick={() => {
+                            if (type === "album" && !isPremium) {
+                              toast.error("Full album uploads require an artist Premium plan.");
+                              onUpgrade?.();
+                              return;
+                            }
+                            updateField("releaseType", type);
+                          }}
                           className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors capitalize ${formData.releaseType === type ? 'gradient-primary text-primary-foreground' : 'bg-surface-elevated/50 text-muted-foreground hover:text-foreground'}`}
                         >
                           {type === "ep" ? "EP" : type}
