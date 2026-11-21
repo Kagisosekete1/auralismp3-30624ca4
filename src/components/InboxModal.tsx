@@ -201,6 +201,10 @@ const InboxModal = ({ isOpen, onClose, initialRecipientId }: InboxModalProps) =>
 
       if (error) throw error;
 
+      void supabase.functions.invoke("send-onesignal", { body: { messageId: data.id } })
+        .then(({ error: pushError }) => {
+          if (pushError) console.error("Message notification failed:", pushError);
+        });
       setMessages((prev) => [...prev, data]);
       setNewMessage("");
       scrollToBottom();

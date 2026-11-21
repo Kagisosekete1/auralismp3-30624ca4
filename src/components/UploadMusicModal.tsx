@@ -5,11 +5,13 @@ import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
+import SearchablePicker, { type PickerOption } from "@/components/SearchablePicker";
+import { genreNames } from "@/data/genres";
 import UploadProgressBar from "@/components/UploadProgressBar";
 import { enqueueUpload } from "@/hooks/useUploadQueue";
 import { pickAudioFile, pickImageFile, isAllowedAudio, isAllowedImage, AUDIO_ACCEPT, IMAGE_ACCEPT } from "@/lib/nativeFilePicker";
 
-const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "flac", "wav"];
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
 
@@ -21,6 +23,13 @@ interface UploadMusicModalProps {
 }
 
 const genres = ["Hip-Hop", "Pop", "Afrobeats", "EDM", "R&B", "Rock", "Drill", "Trap", "House", "Other"];
+const uploadVersionOptions: PickerOption[] = [
+  { value: "original", label: "Original" },
+  { value: "remix", label: "Remix" },
+  { value: "instrumental", label: "Instrumental" },
+  { value: "radio", label: "Radio Edit" },
+];
+const uploadGenreOptions: PickerOption[] = genreNames.map((genre) => ({ value: genre, label: genre }));
 
 const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps) => {
   const { user } = useAuth();
@@ -61,7 +70,11 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   const acceptAudio = (file: File) => {
     if (!isAllowedAudio(file)) {
-      toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
+      toast.error("Please select an MP3, FLAC, or WAV file");
+      return;
+    }
+    if (file.size === 0) {
+      toast.error("Could not read that audio file. Please choose it again from Files.");
       return;
     }
     if (file.size > 100 * 1024 * 1024) {
@@ -77,6 +90,10 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
       toast.error("Please select a JPG, PNG, or WEBP image");
       return;
     }
+    if (file.size === 0) {
+      toast.error("Could not read that cover image. Please choose it again from Photos or Files.");
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Cover image must be under 10MB");
       return;
@@ -89,13 +106,23 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
 
   // Android-safe: opens the system Files picker (SAF) on native builds
   const chooseAudio = async () => {
-    const file = await pickAudioFile();
-    if (file) acceptAudio(file);
+    try {
+      const file = await pickAudioFile();
+      if (file) acceptAudio(file);
+    } catch (error) {
+      console.error("Audio picker failed:", error);
+      toast.error("Could not read that audio file. Please choose an MP3, FLAC, or WAV from Files.");
+    }
   };
 
   const chooseCover = async () => {
-    const file = await pickImageFile();
-    if (file) acceptCover(file);
+    try {
+      const file = await pickImageFile();
+      if (file) acceptCover(file);
+    } catch (error) {
+      console.error("Cover picker failed:", error);
+      toast.error("Could not read that cover image. Please choose a JPG, PNG, or WEBP image.");
+    }
   };
 
   const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,19 +329,11 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Version</label>
-                      <select className={inputClass} value={formData.version} onChange={e => updateField("version", e.target.value)}>
-                        <option value="original">Original</option>
-                        <option value="remix">Remix</option>
-                        <option value="instrumental">Instrumental</option>
-                        <option value="radio">Radio Edit</option>
-                      </select>
+                      <SearchablePicker value={formData.version} options={uploadVersionOptions} onChange={(value) => updateField("version", value)} title="Select release version" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Primary Genre *</label>
-                      <select className={inputClass} value={formData.primaryGenre} onChange={e => updateField("primaryGenre", e.target.value)}>
-                        <option value="">Select genre</option>
-                        {genres.map(g => <option key={g} value={g}>{g}</option>)}
-                      </select>
+                      <SearchablePicker value={formData.primaryGenre} options={uploadGenreOptions} onChange={(value) => updateField("primaryGenre", value)} title="Select genre" placeholder="Search genres..." emptyLabel="Select genre" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">BPM</label>
@@ -357,7 +376,7 @@ const UploadMusicModal = ({ isOpen, onClose, onSuccess }: UploadMusicModalProps)
                         <>
                           <Music2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                           <p className="font-medium text-foreground mb-1">Upload Audio File *</p>
-                          <p className="text-sm text-muted-foreground">WAV, AIFF, FLAC, MP3 • Max 100MB</p>
+                          <p className="text-sm text-muted-foreground">MP3, FLAC, WAV - Max 100MB</p>
                         </>
                       )}
                     </div>

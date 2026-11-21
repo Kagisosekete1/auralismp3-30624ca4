@@ -17,7 +17,7 @@ Copy/paste this brief:
 > 4. The app already uses `@capawesome/capacitor-file-picker` for Storage Access Framework
 >    file selection (`src/lib/nativeFilePicker.ts`) — run `npx cap sync` so the plugin registers.
 > 5. `applicationId` = `app.lovable.b2261c56b9524091923b1fc314dea185`, app name `Auralis`,
->    `minSdkVersion 23`, `targetSdkVersion 35`, JDK 17.
+>    `minSdkVersion 24`, `targetSdkVersion 36`, JDK 17.
 > 6. Debug APK: `cd android && ./gradlew assembleDebug` →
 >    `android/app/build/outputs/apk/debug/app-debug.apk`.
 >    Release AAB for Play: `./gradlew bundleRelease` with a signing keystore configured in
@@ -35,29 +35,15 @@ Copy/paste this brief:
 - **React Native rewrite:** weeks of work, no benefit for a streaming/upload app
   of this shape.
 
-## Mobile upload fix (Aug 2026) — what changed and why
+## Mobile Upload Fix (Aug 2026)
 
-Two bugs made uploads silently fail inside the Android WebView:
+`src/lib/nativeFilePicker.ts` uses the Android Storage Access Framework through
+`@capawesome/capacitor-file-picker`, converts native file paths with
+`Capacitor.convertFileSrc`, rejects unreadable zero-byte picks, and only allows
+MP3, FLAC, and WAV audio.
 
-1. **`src/lib/nativeFilePicker.ts`** — after SAF picking, the code did
-   `fetch("file://" + path)`. Android WebView cannot fetch `file://` or
-   `content://` URIs, so it threw and the picker returned zero files (upload
-   button just did nothing). Fixed by converting the native path with
-   `Capacitor.convertFileSrc(path)` before fetching, plus a base64
-   (`readData: true`) fallback that reconstructs a real `File`.
-2. **`src/hooks/useDatabase.tsx`** (`uploadWithProgress`) — the XHR sent no
-   `Content-Type`, so Storage rejected the object; it also fell back to the
-   anon key when the session was missing, producing an opaque 403. Fixed:
-   explicit `Content-Type`, hard requirement for a signed-in access token,
-   15-minute timeout, and real error text surfaced to the retry UI.
-
-Android requirements for these to work (add to `AndroidManifest.xml`):
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-```
-
-After pulling: `npm install && npm run build && npx cap sync android`
-(the `@capawesome/capacitor-file-picker` plugin must be registered by sync).
+`src/hooks/useDatabase.tsx` now requires a real signed-in session, sends an
+explicit `Content-Type`, verifies that Supabase can see the uploaded object,
+then probes the final public URL before inserting the track row. If the object
+is missing or unplayable, the app fails the upload instead of saving a broken
+song.

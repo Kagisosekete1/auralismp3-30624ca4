@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Music2, Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
+import authLogo from "@/assets/auralis-mark.png";
+import { TermsContent } from "@/components/TermsContent";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -14,6 +17,9 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -48,12 +54,20 @@ const Auth = () => {
     e.preventDefault();
     
     if (!validateForm()) return;
+    if (isSignUp && !termsAccepted) {
+      toast.error("Please read and agree to the Terms of Use.");
+      return;
+    }
+    if (isSignUp && (!displayName.trim() || !/^[a-z0-9_]{15,30}$/.test(username))) {
+      toast.error("Enter a display name and a username of 15-30 lowercase letters, numbers or underscores.");
+      return;
+    }
     
     setIsLoading(true);
     
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, displayName);
+        const { error } = await signUp(email, password, displayName.trim(), username);
         if (error) {
           if (error.message.includes("already registered")) {
             toast.error("This email is already registered. Please sign in instead.");
@@ -103,11 +117,8 @@ const Auth = () => {
           animate={{ scale: 1 }}
           transition={{ delay: 0.1 }}
         >
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center glow-primary mb-4">
-            <Music2 className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-3xl font-display font-bold text-gradient">Auralis</h1>
-          <p className="text-muted-foreground mt-2">Your music, your way</p>
+          <img src={authLogo} alt="Auralis" className="h-28 w-28 rounded-2xl object-contain" />
+          <p className="text-muted-foreground mt-3">Your music, your way</p>
         </motion.div>
 
         {/* Auth Card */}
@@ -141,6 +152,15 @@ const Auth = () => {
                 </div>
               </motion.div>
             )}
+
+            {isSignUp && <div>
+              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-2">Username</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                <input id="username" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} minLength={15} maxLength={30} autoCapitalize="none" autoCorrect="off" placeholder="yourname_2026" className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground outline-none" />
+                <p className="mt-1 text-xs text-muted-foreground">15-30 lowercase letters, numbers, or underscores</p>
+              </div>
+            </div>}
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Email</label>
@@ -185,6 +205,11 @@ const Auth = () => {
               {errors.password && <p className="text-destructive text-xs mt-1">{errors.password}</p>}
             </div>
 
+            {isSignUp && <div className="flex items-start gap-3 text-sm text-muted-foreground">
+              <input id="accept-terms" type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+              <label htmlFor="accept-terms">I agree to the <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-primary underline">Terms of Use</button>.</label>
+            </div>}
+
             <motion.button
               type="submit"
               disabled={isLoading}
@@ -218,6 +243,12 @@ const Auth = () => {
           </div>
         </motion.div>
       </motion.div>
+      <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto border-border bg-background text-foreground">
+          <DialogTitle>Terms of Use</DialogTitle>
+          <TermsContent />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

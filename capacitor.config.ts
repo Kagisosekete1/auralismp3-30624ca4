@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const useLiveReload = process.env.CAP_LIVE_RELOAD === '1';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.b2261c56b9524091923b1fc314dea185',
+  appId: 'com.semogrouptech.auralis',
   appName: 'Auralis',
   webDir: 'dist',
   android: {

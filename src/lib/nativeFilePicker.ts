@@ -5,32 +5,35 @@
  * through @capawesome/capacitor-file-picker, which always opens the system
  * Files/Documents picker (never the Photos gallery) and returns a real File.
  *
- * In a normal browser we fall back to a hidden <input type="file">, using
- * broad MIME accepts so Android Chrome offers "Files" as a source.
+ * In a normal browser we fall back to a hidden <input type="file"> with
+ * the same strict audio and cover-art formats used by the native picker.
  */
 
-export const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac", "aiff", "aif", "ogg"];
+export const AUDIO_EXTENSIONS = ["mp3", "flac", "wav"];
 export const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
-export const AUDIO_ACCEPT = "audio/*,.mp3,.wav,.flac,.m4a,.aac,.aiff,.aif,.ogg";
+export const AUDIO_ACCEPT = ".mp3,.flac,.wav,audio/mpeg,audio/flac,audio/wav,audio/x-wav";
 export const IMAGE_ACCEPT = "image/*,.jpg,.jpeg,.png,.webp";
 
-const AUDIO_MIME_TYPES = [
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/flac",
-  "audio/x-flac",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/x-m4a",
-  "audio/aac",
-  "audio/aiff",
-  "audio/ogg",
-];
+const AUDIO_PICKER_TYPES = ["audio/*"];
 
-const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp3: "audio/mpeg",
+  flac: "audio/flac",
+  wav: "audio/wav",
+};
+
+const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/vnd.wave": "wav",
+};
 
 export const isNativePlatform = (): boolean => {
   const cap = (window as any)?.Capacitor;
@@ -39,79 +42,118 @@ export const isNativePlatform = (): boolean => {
 
 export const getExtension = (name: string) => name.split(".").pop()?.toLowerCase() || "";
 
-export const isAllowedAudio = (file: File) =>
-  file.type.startsWith("audio/") || AUDIO_EXTENSIONS.includes(getExtension(file.name));
+const getKnownFileType = (name: string, fallback = "") =>
+  AUDIO_MIME_BY_EXTENSION[getExtension(name)] || fallback;
+
+export const isAllowedAudio = (file: File) => {
+  const extension = getExtension(file.name);
+  return AUDIO_EXTENSIONS.includes(extension) || Boolean(AUDIO_EXTENSION_BY_MIME[file.type]);
+};
 
 export const isAllowedImage = (file: File) =>
-  file.type.startsWith("image/") || IMAGE_EXTENSIONS.includes(getExtension(file.name));
+  IMAGE_EXTENSIONS.includes(getExtension(file.name)) || IMAGE_MIME_TYPES.includes(file.type);
 
 type PickKind = "audio" | "image";
 
-const base64ToFile = (base64: string, name: string, type: string): File => {
+const shouldUseNativePicker = async () => {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    return Capacitor.isNativePlatform();
+  } catch {
+    return isNativePlatform();
+  }
+};
+
+const makeSafeFileName = (picked: { name?: string; mimeType?: string }, kind: PickKind) => {
+  const name = picked.name?.trim();
+  if (name && getExtension(name)) return name;
+  if (name && kind === "audio") {
+    const inferredExt = AUDIO_EXTENSION_BY_MIME[(picked.mimeType || "").toLowerCase()];
+    return inferredExt ? `${name}.${inferredExt}` : name;
+  }
+  if (name) return name;
+  return kind === "audio" ? "selected-audio.mp3" : "selected-cover.jpg";
+};
+
+const fileFromBase64 = (base64: string, fileName: string, type: string) => {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new File([bytes], name, { type });
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type });
 };
 
 const pickNative = async (kind: PickKind, multiple: boolean): Promise<File[]> => {
+  const { Capacitor } = await import("@capacitor/core");
   const { FilePicker } = await import("@capawesome/capacitor-file-picker");
+
   const result = await FilePicker.pickFiles({
-    types: kind === "audio" ? AUDIO_MIME_TYPES : IMAGE_MIME_TYPES,
+    types: kind === "audio" ? AUDIO_PICKER_TYPES : IMAGE_MIME_TYPES,
     limit: multiple ? 0 : 1,
     readData: false,
   });
 
-  const cap = (window as any)?.Capacitor;
   const files: File[] = [];
-
   for (const picked of result.files || []) {
-    const name = picked.name || `upload-${Date.now()}`;
-    const type = picked.mimeType || (kind === "audio" ? "audio/mpeg" : "image/jpeg");
+    const name = makeSafeFileName(picked, kind);
+    const type = getKnownFileType(name, picked.mimeType || "");
 
-    // 1) Plugin already handed us a real Blob/File (web + some iOS cases)
-    const rawBlob = (picked as any).blob as Blob | undefined;
-    if (rawBlob) {
-      files.push(new File([rawBlob], name, { type: rawBlob.type || type }));
+    if (kind === "audio" && !AUDIO_EXTENSIONS.includes(getExtension(name))) {
+      throw new Error(`"${name}" is not supported. Please choose an MP3, FLAC, or WAV file.`);
+    }
+
+    // The plugin exposes a real File on Android/iOS web view when available.
+    if ((picked as any).blob) {
+      const blob = (picked as any).blob as Blob;
+      if (!blob.size || (picked.size > 0 && blob.size !== picked.size)) {
+        throw new Error(`Could not read the complete file "${name}" from device storage.`);
+      }
+      files.push(new File([blob], name, { type: type || blob.type }));
       continue;
     }
 
-    // 2) Native Android: a `content://`/`file://` path CANNOT be fetched directly
-    //    from the WebView. It must be converted with Capacitor.convertFileSrc,
-    //    which proxies it through the local capacitor http server.
-    const nativePath = (picked as any).path || (picked as any).webPath;
-    if (nativePath) {
-      try {
-        const src = cap?.convertFileSrc ? cap.convertFileSrc(nativePath) : nativePath;
-        const response = await fetch(src);
-        if (!response.ok) throw new Error(`status ${response.status}`);
-        const blob = await response.blob();
-        if (blob.size > 0) {
-          files.push(new File([blob], name, { type: blob.type || type }));
-          continue;
+    if (picked.path || (picked as any).webPath) {
+      const source = (picked as any).webPath || picked.path!;
+      const urls = [Capacitor.convertFileSrc(source), source].filter(
+        (url, index, all) => Boolean(url) && all.indexOf(url) === index,
+      );
+      let blob: Blob | null = null;
+
+      for (const url of urls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const candidate = await response.blob();
+            if (candidate.size > 0 && (!picked.size || candidate.size === picked.size)) {
+              blob = candidate;
+              break;
+            }
+          }
+        } catch {
+          // Try the next URI form below.
         }
-      } catch (error) {
-        console.warn("convertFileSrc read failed, falling back to base64", error);
       }
+
+      if (!blob) throw new Error(`Could not read the complete file "${name}" from Android storage. Please select it again from Files.`);
+      files.push(new File([blob], name, { type: type || blob.type }));
+      continue;
     }
 
-    // 3) Last resort: ask the plugin to read the bytes for us as base64.
-    try {
-      const withData = await FilePicker.pickFiles({
-        types: kind === "audio" ? AUDIO_MIME_TYPES : IMAGE_MIME_TYPES,
-        limit: 1,
-        readData: true,
-      });
-      const d = withData.files?.[0];
-      if (d?.data) files.push(base64ToFile(d.data, d.name || name, d.mimeType || type));
-    } catch (error) {
-      console.warn("base64 fallback failed", error);
+    if ((picked as any).data) {
+      files.push(fileFromBase64((picked as any).data, name, type || "application/octet-stream"));
+      continue;
     }
+
+    throw new Error(`Could not read "${name}" from Android storage.`);
   }
-
   return files;
 };
 
+const isPickerCancel = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /cancel/i.test(message);
+};
 
 const pickWeb = (kind: PickKind, multiple: boolean): Promise<File[]> =>
   new Promise((resolve) => {
@@ -152,11 +194,13 @@ const pickWeb = (kind: PickKind, multiple: boolean): Promise<File[]> =>
   });
 
 export const pickFiles = async (kind: PickKind, multiple = false): Promise<File[]> => {
-  if (isNativePlatform()) {
+  if (await shouldUseNativePicker()) {
     try {
       return await pickNative(kind, multiple);
     } catch (error) {
-      console.warn("Native file picker failed, falling back to web input", error);
+      if (isPickerCancel(error)) return [];
+      console.error("Native file picker failed", error);
+      throw error;
     }
   }
   return pickWeb(kind, multiple);

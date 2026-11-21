@@ -12,9 +12,10 @@ import { genreNames } from "@/data/genres";
 import { supabase } from "@/integrations/supabase/client";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import UploadProgressBar from "@/components/UploadProgressBar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import SearchablePicker, { type PickerOption } from "@/components/SearchablePicker";
 import {
   pickAudioFile,
-  pickAudioFiles,
   pickImageFile,
   isAllowedAudio,
   isAllowedImage,
@@ -22,8 +23,56 @@ import {
   IMAGE_ACCEPT,
 } from "@/lib/nativeFilePicker";
 
-const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "aac"];
+const ALLOWED_AUDIO_EXTENSIONS = ["mp3", "flac", "wav"];
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
+function GenrePicker({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {
+  const options: PickerOption[] = genreNames.map((genre) => ({ value: genre, label: genre }));
+  return <SearchablePicker value={value} options={options} onChange={onChange} title="Select genre" emptyLabel={optional ? "Select genre (optional)" : "Select genre"} optional={optional} />;
+}
+
+const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/vnd.wave": "wav",
+};
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return "0 MB";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
+const getFileExtension = (name: string) => name.split(".").pop()?.toLowerCase() || "";
+
+const getTrackTitleFromFile = (file: File) =>
+  file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
+
+const normalizeAudioFile = (file: File) => {
+  const extension = getFileExtension(file.name);
+  if (ALLOWED_AUDIO_EXTENSIONS.includes(extension)) return file;
+
+  const inferredExtension = AUDIO_EXTENSION_BY_MIME[file.type?.toLowerCase() || ""];
+  if (!inferredExtension) return file;
+
+  const baseName = file.name.replace(/\.[^/.]+$/, "").trim() || "selected-audio";
+  return new File([file], `${baseName}.${inferredExtension}`, {
+    type: file.type || `audio/${inferredExtension}`,
+    lastModified: file.lastModified,
+  });
+};
+
+const assertReadableFile = async (file: File, label: string) => {
+  if (!file || file.size === 0) {
+    throw new Error(`Could not read that ${label}. Please choose it again from Files.`);
+  }
+
+  await file.slice(0, Math.min(file.size, 4096)).arrayBuffer();
+};
 
 
 
@@ -39,9 +88,14 @@ const languages = [
   "Dutch", "Arabic", "Hindi", "Mandarin", "Japanese", "Korean", "Other"
 ];
 
-const vocalTypes = ["Lead Vocal", "Background Vocal", "Instrumental Only", "Duet", "Choir"];
+const languageOptions: PickerOption[] = languages.map((language) => ({ value: language, label: language }));
+const versionOptions: PickerOption[] = ["Original", "Deluxe", "Instrumental", "Clean", "Radio Edit", "Remix"].map((version) => ({ value: version, label: version }));
 
-const UPLOAD_FORM_KEY = "auralis_upload_form";
+const vocalTypes = ["Lead Vocal", "Background Vocal", "Instrumental Only", "Duet", "Choir"];
+const vocalTypeOptions: PickerOption[] = vocalTypes.map((type) => ({ value: type, label: type }));
+
+const UPLOAD_FORM_KEY = "auralis_upload_form_v2";
+const getTodayDate = () => new Date().toISOString().slice(0, 10);
 
 const getInitialFormData = () => {
   try {
@@ -65,7 +119,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const uploadProgress = useUploadProgress();
   const [step, setStep] = useState(() => {
     const saved = getInitialFormData();
-    return saved?.step || 1;
+    return Math.min(saved?.step || 1, 5);
   });
   const [isUploading, setIsUploading] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +138,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const [trackFiles, setTrackFiles] = useState<TrackFile[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [currentTrackTitle, setCurrentTrackTitle] = useState("");
 
   const defaultFormData = {
@@ -117,7 +172,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     recordLabel: "",
     
     // Dates
-    originallyReleased: "",
+    originallyReleased: getTodayDate(),
     preOrderDate: "",
     salesStartDate: "",
     
@@ -178,6 +233,18 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     };
   }, [formData, step, isOpen]);
 
+  useEffect(() => {
+    const firstTrack = trackFiles[0]?.file;
+    if (!firstTrack) {
+      setAudioPreviewUrl(null);
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(firstTrack);
+    setAudioPreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [trackFiles]);
+
   // Clear saved data on successful submit
   const clearSavedData = () => {
     try {
@@ -214,9 +281,20 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
     input.click();
   };
 
-  const acceptAudioFile = (file: File) => {
-    if (!isAllowedAudio(file)) {
-      toast.error("Please select an MP3, WAV, FLAC, M4A, or AAC file");
+  const acceptAudioFile = async (incomingFile: File) => {
+    const file = normalizeAudioFile(incomingFile);
+    const extension = getFileExtension(file.name);
+
+    if (!isAllowedAudio(file) || !ALLOWED_AUDIO_EXTENSIONS.includes(extension)) {
+      toast.error("Please select an MP3, FLAC, or WAV file");
+      return;
+    }
+
+    try {
+      await assertReadableFile(file, "audio file");
+    } catch (error) {
+      console.error("Audio file read check failed:", error);
+      toast.error("Could not read that audio file. Please choose it again from Files.");
       return;
     }
 
@@ -225,9 +303,15 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       return;
     }
 
+    const inferredTitle = getTrackTitleFromFile(file);
+    const previousInferredTitle = trackFiles[0] ? getTrackTitleFromFile(trackFiles[0].file) : "";
+    if (!formData.title.trim() || (formData.releaseType === "single" && formData.title === previousInferredTitle)) {
+      updateField("title", inferredTitle);
+    }
+
     // For singles, just add the single track
     if (formData.releaseType === "single") {
-      setTrackFiles([{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, file, title: currentTrackTitle || formData.title || file.name.replace(/\.[^/.]+$/, "") }]);
+      setTrackFiles([{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, file, title: inferredTitle }]);
     } else {
       if (trackFiles.length >= maxTracks) {
         toast.error(`Maximum ${maxTracks} tracks allowed.`);
@@ -236,7 +320,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       setTrackFiles(prev => [...prev, {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         file,
-        title: currentTrackTitle || file.name.replace(/\.[^/.]+$/, "")
+        title: currentTrackTitle || inferredTitle
       }]);
       setCurrentTrackTitle("");
     }
@@ -245,18 +329,28 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
   // Android-safe: uses the system Files picker (SAF) inside the native app
   const chooseAudio = async () => {
-    const files = formData.releaseType === "single" ? [await pickAudioFile()] : await pickAudioFiles();
-    files.filter(Boolean).forEach((f) => acceptAudioFile(f as File));
+    try {
+      const file = await pickAudioFile();
+      if (file) await acceptAudioFile(file);
+    } catch (error) {
+      console.error("Audio picker failed:", error);
+      toast.error("Could not read that audio file. Please choose an MP3, FLAC, or WAV from Files.");
+    }
   };
 
   const chooseCover = async () => {
-    const file = await pickImageFile();
-    if (file) acceptCoverFile(file);
+    try {
+      const file = await pickImageFile();
+      if (file) acceptCoverFile(file);
+    } catch (error) {
+      console.error("Cover picker failed:", error);
+      toast.error("Could not read that cover image. Please choose a JPG, PNG, or WEBP image.");
+    }
   };
 
-  const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) acceptAudioFile(file);
+    if (file) await acceptAudioFile(file);
     e.target.value = "";
   };
 
@@ -282,6 +376,11 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const acceptCoverFile = (file: File) => {
     if (!isAllowedImage(file)) {
       toast.error("Please select a JPG, PNG, or WEBP image");
+      return;
+    }
+
+    if (file.size === 0) {
+      toast.error("Could not read that cover image. Please choose it again from Photos or Files.");
       return;
     }
 
@@ -317,8 +416,10 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       for (let i = 0; i < trackFiles.length; i++) {
         const track = trackFiles[i];
         uploadProgress.setTrackInfo(i, trackFiles.length);
+        await assertReadableFile(track.file, "audio file");
+        if (coverFile) await assertReadableFile(coverFile, "cover image");
 
-        await uploadTrack(track.file, coverFile, {
+        const savedTrack = await uploadTrack(track.file, coverFile, {
           title: trackFiles.length === 1 ? formData.title : track.title,
           artistName: formData.primaryArtist || profile?.display_name || "Unknown Artist",
           genre: formData.primaryGenre,
@@ -332,6 +433,9 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
           onCoverProgress: (p) => uploadProgress.setCoverProgress(p),
           onSaving: () => uploadProgress.setPhase("saving"),
         });
+        if (!savedTrack?.id || !savedTrack.audio_url) {
+          throw new Error(`"${track.file.name}" was not saved to your music library. Please try again.`);
+        }
       }
 
       uploadProgress.complete();
@@ -425,7 +529,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
       compositionCopyright: "",
       recordingCopyright: "",
       recordLabel: "",
-      originallyReleased: "",
+      originallyReleased: getTodayDate(),
       preOrderDate: "",
       salesStartDate: "",
       isExplicit: false,
@@ -441,7 +545,8 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
   const inputClass = "w-full px-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all text-sm";
   const selectClass = `${inputClass} appearance-none cursor-pointer`;
 
-  const totalSteps = 6;
+  const totalSteps = 5;
+  const contentStep = step === 1 ? 4 : step === 5 ? 5 : step - 1;
 
   if (!isOpen) return null;
 
@@ -510,7 +615,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
 
           <div className="p-6 space-y-6">
             {/* Step 1: Release Details */}
-            {step === 1 && (
+            {contentStep === 1 && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <Globe className="w-5 h-5 text-primary" />
@@ -520,9 +625,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Language</label>
-                    <select className={selectClass} value={formData.language} onChange={e => updateField("language", e.target.value)}>
-                      {languages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                    </select>
+                    <SearchablePicker value={formData.language} options={languageOptions} onChange={(value) => updateField("language", value)} title="Select language" placeholder="Search languages..." />
                   </div>
                   
                   <div>
@@ -550,14 +653,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Version</label>
-                    <select className={selectClass} value={formData.version} onChange={e => updateField("version", e.target.value)}>
-                      <option value="Original">Original</option>
-                      <option value="Deluxe">Deluxe</option>
-                      <option value="Instrumental">Instrumental</option>
-                      <option value="Clean">Clean</option>
-                      <option value="Radio Edit">Radio Edit</option>
-                      <option value="Remix">Remix</option>
-                    </select>
+                    <SearchablePicker value={formData.version} options={versionOptions} onChange={(value) => updateField("version", value)} title="Select release version" placeholder="Search release versions..." />
                   </div>
                 </div>
                 
@@ -582,7 +678,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
             )}
 
             {/* Step 2: Artist & Publishing */}
-            {step === 2 && (
+            {contentStep === 2 && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <User className="w-5 h-5 text-primary" />
@@ -642,9 +738,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                   
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Vocals</label>
-                    <select className={selectClass} value={formData.vocalType} onChange={e => updateField("vocalType", e.target.value)}>
-                      {vocalTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
+                    <SearchablePicker value={formData.vocalType} options={vocalTypeOptions} onChange={(value) => updateField("vocalType", value)} title="Select vocal type" placeholder="Search vocal types..." />
                   </div>
                 </div>
                 
@@ -659,7 +753,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
             )}
 
             {/* Step 3: Genre & Copyright */}
-            {step === 3 && (
+            {contentStep === 3 && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <Tag className="w-5 h-5 text-primary" />
@@ -669,18 +763,12 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Primary Genre *</label>
-                    <select className={selectClass} value={formData.primaryGenre} onChange={e => updateField("primaryGenre", e.target.value)}>
-                      <option value="">Select genre</option>
-                      {genreNames.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
+                    <GenrePicker value={formData.primaryGenre} onChange={(value) => updateField("primaryGenre", value)} />
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Secondary Genre</label>
-                    <select className={selectClass} value={formData.secondaryGenre} onChange={e => updateField("secondaryGenre", e.target.value)}>
-                      <option value="">Select genre (optional)</option>
-                      {genreNames.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
+                    <GenrePicker value={formData.secondaryGenre} onChange={(value) => updateField("secondaryGenre", value)} optional />
                   </div>
                 </div>
                 
@@ -705,58 +793,228 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     <input className={inputClass} placeholder="Use your artist name if independent" value={formData.recordLabel} onChange={e => updateField("recordLabel", e.target.value)} />
                   </div>
                 </div>
+
+                <div className="mt-8 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-5 h-5 text-primary mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Release Date</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Set automatically to the day this music is uploaded.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <h4 className="text-sm font-medium text-foreground mb-3">Explicit Content *</h4>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => updateField("isExplicit", false)}
+                        className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${!formData.isExplicit ? 'gradient-primary text-primary-foreground' : 'bg-surface-elevated/50 text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Not Explicit
+                      </button>
+                      <button
+                        onClick={() => updateField("isExplicit", true)}
+                        className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${formData.isExplicit ? 'bg-destructive text-destructive-foreground' : 'bg-surface-elevated/50 text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Explicit
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
-            {/* Step 4: Dates & Content */}
-            {step === 4 && (
+            {/* Step 4: Studio Upload */}
+            {contentStep === 4 && (
               <>
-                <div className="flex items-center gap-2 mb-4">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-display font-bold text-foreground">Release Dates</h3>
+                <div className="relative overflow-hidden rounded-[28px] border border-primary/25 bg-[radial-gradient(circle_at_top_left,rgba(0,217,138,0.18),transparent_34%),linear-gradient(135deg,rgba(1,24,20,0.97),rgba(0,17,35,0.96))] p-5 shadow-2xl shadow-primary/10">
+                  <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent" />
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-primary">
+                        <Music2 className="w-5 h-5" />
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em]">Studio Upload</span>
+                      </div>
+                      <h3 className="mt-2 text-2xl font-display font-bold text-foreground">
+                        {formData.releaseType === "single" ? "Add Your Sound" : `Add ${formData.releaseType.toUpperCase()} Sounds`}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        MP3, FLAC, or WAV only. Files are checked before upload so missing audio cannot pass.
+                      </p>
+                    </div>
+                    {formData.releaseType !== "single" && (
+                      <div className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-right">
+                        <p className="text-lg font-bold text-foreground">{trackFiles.length}</p>
+                        <p className="text-[11px] text-muted-foreground">of {maxTracks}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <input ref={audioInputRef} type="file" accept={AUDIO_ACCEPT} capture={undefined} onChange={handleAudioSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+
+                  {formData.releaseType !== "single" && (
+                    <div className="mt-5">
+                      <label className="block text-sm font-medium text-foreground mb-2">Track title before adding</label>
+                      <input
+                        className={inputClass}
+                        placeholder="e.g. Midnight Groove"
+                        value={currentTrackTitle}
+                        onChange={e => setCurrentTrackTitle(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={chooseAudio}
+                    disabled={isUploading}
+                    className={`mt-5 w-full rounded-[24px] border p-5 text-left transition-all disabled:opacity-60 ${trackFiles.length > 0 ? 'border-primary/40 bg-primary/10 shadow-lg shadow-primary/10' : 'border-dashed border-border/60 bg-black/20 hover:border-primary/60 hover:bg-primary/5'}`}
+                  >
+                    {formData.releaseType === "single" && trackFiles[0] ? (
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary/25">
+                          <FileAudio className="w-8 h-8 text-white" />
+                          <span className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full bg-background border border-primary/40 flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 text-primary" />
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-primary">Sound ready</p>
+                          <p className="mt-1 text-lg font-bold text-foreground truncate">{trackFiles[0].title}</p>
+                          <p className="text-sm text-muted-foreground truncate">{trackFiles[0].file.name} - {formatFileSize(trackFiles[0].file.size)}</p>
+                          <p className="mt-2 text-xs text-primary">Tap here to change the selected sound</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                          <Plus className="w-8 h-8 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-foreground">{formData.releaseType === "single" ? "Choose Sound File" : "Add Sound From Files"}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Opens device Files or Storage. Max 100MB per sound.</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {ALLOWED_AUDIO_EXTENSIONS.map((ext) => (
+                              <span key={ext} className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">
+                                {ext}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+
+                  {audioPreviewUrl && trackFiles[0] && (
+                    <div className="mt-4 rounded-2xl border border-border/30 bg-black/25 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-foreground truncate">Preview selected sound</p>
+                        <button
+                          type="button"
+                          onClick={() => removeTrack(trackFiles[0].id)}
+                          disabled={isUploading}
+                          className="rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <audio controls src={audioPreviewUrl} className="w-full h-10" preload="metadata" />
+                    </div>
+                  )}
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Originally Released *</label>
-                    <input type="date" className={inputClass} value={formData.originallyReleased} onChange={e => updateField("originallyReleased", e.target.value)} />
-                    <p className="text-xs text-muted-foreground mt-1">The date this was first made public</p>
+
+                {trackFiles.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-foreground">Selected sounds</h4>
+                      <span className="text-xs text-muted-foreground">{trackFiles.length} ready</span>
+                    </div>
+                    {trackFiles.map((track, index) => (
+                      <div key={track.id} className="rounded-2xl border border-border/30 bg-surface-elevated/35 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary font-bold text-sm">
+                            {index + 1}
+                          </div>
+                          <FileAudio className="w-5 h-5 text-primary flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            {formData.releaseType !== "single" ? (
+                              <input
+                                className="w-full bg-transparent border-b border-border/30 focus:border-primary outline-none text-foreground text-sm font-medium"
+                                value={track.title}
+                                onChange={e => updateTrackTitle(track.id, e.target.value)}
+                                placeholder="Track title"
+                              />
+                            ) : (
+                              <p className="font-semibold text-foreground truncate">{track.title}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground truncate">{track.file.name} - {formatFileSize(track.file.size)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeTrack(track.id)}
+                            disabled={isUploading}
+                            className="p-2 rounded-xl hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-60"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Sales Start Date</label>
-                    <input type="date" className={inputClass} value={formData.salesStartDate} onChange={e => updateField("salesStartDate", e.target.value)} />
-                    <p className="text-xs text-muted-foreground mt-1">Leave blank to go live immediately</p>
+                )}
+
+                {formData.releaseType !== "single" && (
+                  <div className="rounded-2xl border border-border/30 bg-surface-elevated/30 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      {formData.releaseType === "ep" ? "EPs should have 2-6 tracks." : "Albums should have at least 3 tracks."}
+                      {!isPremium && ` Free uploads allow up to ${maxTracks} tracks.`}
+                    </p>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Pre-Order Date</label>
-                    <input type="date" className={inputClass} value={formData.preOrderDate} onChange={e => updateField("preOrderDate", e.target.value)} />
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_0.8fr] gap-4">
+                  <input ref={coverInputRef} type="file" accept={IMAGE_ACCEPT} capture={undefined} onChange={handleCoverSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ""; }} className="hidden" />
+                  <div className="rounded-[24px] border border-border/35 bg-surface-elevated/30 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-20 h-20 rounded-2xl overflow-hidden bg-black/30 flex items-center justify-center flex-shrink-0">
+                        {coverPreviewUrl ? (
+                          <img src={coverPreviewUrl} alt="Selected cover art preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Image className="w-8 h-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-semibold text-foreground">Cover Art</h4>
+                        <p className="text-sm text-muted-foreground truncate">{coverFile ? `${coverFile.name} - ${formatFileSize(coverFile.size)}` : "JPG, PNG, or WEBP"}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button type="button" onClick={chooseCover} disabled={isUploading} className="rounded-xl gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+                            {coverFile ? "Change Cover" : "Choose Cover"}
+                          </button>
+                          {coverFile && (
+                            <button type="button" onClick={removeCover} disabled={isUploading} className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive disabled:opacity-60">
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="mt-8">
-                  <h4 className="text-sm font-medium text-foreground mb-3">Explicit Content *</h4>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => updateField("isExplicit", false)}
-                      className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${!formData.isExplicit ? 'gradient-primary text-primary-foreground' : 'bg-surface-elevated/50 text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Not Explicit
-                    </button>
-                    <button
-                      onClick={() => updateField("isExplicit", true)}
-                      className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${formData.isExplicit ? 'bg-destructive text-destructive-foreground' : 'bg-surface-elevated/50 text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Explicit
-                    </button>
+
+                  <div className="rounded-[24px] border border-primary/30 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-primary mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">ISRC and Upload Date</h4>
+                        <p className="mt-1 text-xs text-muted-foreground">ISRC is auto-generated. Release date is the day the sound is uploaded.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
             )}
 
-            {/* Step 5: Upload Files */}
-            {step === 5 && (
+            {/* Step 4: Upload Files */}
+            {false && step === 4 && (
               <>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -793,19 +1051,28 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                     onClick={chooseAudio}
                     className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${trackFiles.length > 0 ? 'border-primary/50 bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
                   >
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                        <Plus className="w-6 h-6 text-primary" />
+                    {formData.releaseType === "single" && trackFiles[0] ? (
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <FileAudio className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground truncate">{trackFiles[0].title}</p>
+                          <p className="text-sm text-muted-foreground truncate">{trackFiles[0].file.name} • {(trackFiles[0].file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          <p className="text-xs text-primary mt-1">Tap to change selected music file</p>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="font-medium text-foreground">
-                          {formData.releaseType === "single" 
-                            ? (trackFiles.length > 0 ? "Change Selected Music File" : "Choose Music File *")
-                            : "Add Track from Files"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Opens device Files/Storage • MP3, WAV, FLAC, M4A, AAC • Max 100MB</p>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-medium text-foreground">{formData.releaseType === "single" ? "Choose Music File *" : "Add Track from Files"}</p>
+                          <p className="text-sm text-muted-foreground">Opens device Files/Storage • MP3, FLAC, WAV • Max 100MB</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Track List */}
@@ -922,8 +1189,8 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
               </>
             )}
 
-            {/* Step 6: Terms & Submit */}
-            {step === 6 && (
+            {/* Step 5: Terms & Submit */}
+            {step === 5 && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <AlertCircle className="w-5 h-5 text-primary" />
@@ -991,7 +1258,7 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
                       <button className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium flex items-center gap-1">
                         <Share2 className="w-3 h-3" /> WhatsApp
                       </button>
-                      <button className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium flex items-center gap-1">
+                      <button className="px-3 py-1.5 rounded-lg gradient-primary text-white text-xs font-medium flex items-center gap-1">
                         <Share2 className="w-3 h-3" /> Instagram
                       </button>
                     </div>
@@ -1015,23 +1282,20 @@ const FullUploadForm = ({ isOpen, onClose, onSuccess }: FullUploadFormProps) => 
               <button
                 onClick={() => {
                   // Validate each step before proceeding
-                  if (step === 1) {
+                  if (contentStep === 1) {
                     if (!formData.title.trim()) { toast.error("Please enter a release title"); return; }
                   }
-                  if (step === 2) {
+                  if (contentStep === 2) {
                     if (!formData.primaryArtist.trim()) { toast.error("Please enter a primary artist name"); return; }
                     if (!formData.writers.trim()) { toast.error("Please enter writer name(s)"); return; }
                   }
-                  if (step === 3) {
+                  if (contentStep === 3) {
                     if (!formData.primaryGenre) { toast.error("Please select a primary genre"); return; }
                     if (!formData.compositionCopyright.trim()) { toast.error("Please enter composition copyright"); return; }
                     if (!formData.recordingCopyright.trim()) { toast.error("Please enter recording copyright"); return; }
                     if (!formData.recordLabel.trim()) { toast.error("Please enter a record label"); return; }
                   }
-                  if (step === 4) {
-                    if (!formData.originallyReleased) { toast.error("Please enter an original release date"); return; }
-                  }
-                  if (step === 5) {
+                  if (contentStep === 4) {
                     if (trackFiles.length === 0) { toast.error("Please upload at least one audio file"); return; }
                     // Validate track titles
                     const emptyTitle = trackFiles.find(t => !t.title.trim());

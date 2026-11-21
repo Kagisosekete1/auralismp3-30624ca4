@@ -5,6 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { allGenres } from "@/data/genres";
+import SearchablePicker, { type PickerOption } from "@/components/SearchablePicker";
+
+const editGenreOptions: PickerOption[] = allGenres.map(({ name }) => ({ value: name, label: name }));
+const editVersionOptions: PickerOption[] = ["original", "remix", "acoustic", "instrumental", "live", "clean"].map((version) => ({ value: version, label: version.replace(/^./, (letter) => letter.toUpperCase()) }));
 
 interface Track {
   id: string;
@@ -197,29 +201,11 @@ const EditReleaseModal = ({ isOpen, onClose, track, onSuccess, onDelete }: EditR
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Primary Genre</label>
-                <select
-                  value={formData.genre}
-                  onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-elevated/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                >
-                  <option value="">Select genre</option>
-                  {allGenres.map((g) => (
-                    <option key={g.name} value={g.name}>{g.name}</option>
-                  ))}
-                </select>
+                <SearchablePicker value={formData.genre} options={editGenreOptions} onChange={(genre) => setFormData({ ...formData, genre })} title="Select primary genre" placeholder="Search genres..." emptyLabel="Select genre" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Secondary Genre</label>
-                <select
-                  value={formData.secondary_genre}
-                  onChange={(e) => setFormData({ ...formData, secondary_genre: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-elevated/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                >
-                  <option value="">Select genre</option>
-                  {allGenres.map((g) => (
-                    <option key={g.name} value={g.name}>{g.name}</option>
-                  ))}
-                </select>
+                <SearchablePicker value={formData.secondary_genre} options={editGenreOptions} onChange={(secondary_genre) => setFormData({ ...formData, secondary_genre })} title="Select secondary genre" placeholder="Search genres..." emptyLabel="Select genre" optional />
               </div>
             </div>
 
@@ -252,18 +238,7 @@ const EditReleaseModal = ({ isOpen, onClose, track, onSuccess, onDelete }: EditR
             {/* Version */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Version</label>
-              <select
-                value={formData.version}
-                onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-elevated/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-              >
-                <option value="original">Original</option>
-                <option value="remix">Remix</option>
-                <option value="acoustic">Acoustic</option>
-                <option value="instrumental">Instrumental</option>
-                <option value="live">Live</option>
-                <option value="clean">Clean</option>
-              </select>
+              <SearchablePicker value={formData.version} options={editVersionOptions} onChange={(version) => setFormData({ ...formData, version })} title="Select release version" />
             </div>
 
             {/* Explicit */}

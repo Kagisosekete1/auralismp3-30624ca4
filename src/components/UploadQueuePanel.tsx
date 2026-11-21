@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, FileAudio, Loader2, RefreshCw, Upload, WifiOff, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useDatabase } from "@/hooks/useDatabase";
 import {
   attachAudio,
@@ -10,7 +11,7 @@ import {
   useUploadQueueItems,
   useUploadQueueProcessor,
 } from "@/hooks/useUploadQueue";
-import { pickAudioFile } from "@/lib/nativeFilePicker";
+import { isAllowedAudio, pickAudioFile } from "@/lib/nativeFilePicker";
 
 const phaseLabel: Record<string, string> = {
   waiting: "Waiting…",
@@ -103,8 +104,18 @@ const UploadQueuePanel = ({ onUploaded }: { onUploaded?: () => void }) => {
                   {item.status === "needs-file" && (
                     <button
                       onClick={async () => {
-                        const file = await pickAudioFile();
-                        if (file) attachAudio(item.id, file);
+                        try {
+                          const file = await pickAudioFile();
+                          if (!file) return;
+                          if (!isAllowedAudio(file) || file.size === 0) {
+                            toast.error("Please re-attach a readable MP3, FLAC, or WAV file.");
+                            return;
+                          }
+                          attachAudio(item.id, file);
+                        } catch (error) {
+                          console.error("Audio re-attach failed:", error);
+                          toast.error("Could not re-attach that audio file. Please choose it again from Files.");
+                        }
                       }}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-lg gradient-primary text-xs font-semibold text-primary-foreground"
                     >

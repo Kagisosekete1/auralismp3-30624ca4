@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Music2, TrendingUp, Clock, Flame, Headphones, ChevronRight, UserPlus, Check, Sparkles } from "lucide-react";
+import { Music2, TrendingUp, Clock, Flame, Headphones, ChevronRight, UserPlus, Check, Sparkles, Search, Bell, Play, UploadCloud } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import TrackCard from "../TrackCard";
 import PremiumUpsellBanner from "../PremiumUpsellBanner";
+import SearchModal from "../SearchModal";
 import type { Playlist } from "@/hooks/useAppState";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { dispatchPushNotification } from "@/lib/dispatchPushNotification";
 
 interface Track {
   id: string;
@@ -51,6 +53,7 @@ export interface HomePageProps {
   onArtistClick?: (track: Track) => void;
   onPlayAll?: () => void;
   onShuffleAll?: () => void;
+  onSectionChange?: (section: string) => void;
 }
 
 const itemVariants = {
@@ -125,7 +128,9 @@ const ArtistMiniCard = ({ artist, onViewProfile, onPlayTrack, onAddToPlaylist }:
     if (followed) {
       await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", artist.userId);
     } else {
-      await supabase.from("follows").insert({ follower_id: user.id, following_id: artist.userId });
+      const { error } = await supabase.from("follows").insert({ follower_id: user.id, following_id: artist.userId });
+      if (error) return;
+      void dispatchPushNotification("follower", user.id, user.id);
     }
     setFollowed(!followed);
   };
@@ -184,7 +189,7 @@ const ArtistMiniCard = ({ artist, onViewProfile, onPlayTrack, onAddToPlaylist }:
   );
 };
 
-const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist, onUpgrade, onArtistClick, onPlayAll, onShuffleAll }: HomePageProps) => {
+const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic, tracks = [], onPlayTrack, onViewProfile, onAddToPlaylist, onUpgrade, onArtistClick, onPlayAll, onShuffleAll, onSectionChange }: HomePageProps) => {
   const { user } = useAuth();
   const { profile } = useDatabase();
   const [totalPlays, setTotalPlays] = useState(0);
@@ -196,6 +201,7 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
   const [forYouTracks, setForYouTracks] = useState<Track[]>([]);
   const [topArtists, setTopArtists] = useState<ArtistCard[]>([]);
   const [userGenre, setUserGenre] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -406,19 +412,74 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
     }
   };
 
+  const featuredTrack = useMemo(() => weeklyTrending[0] || liveTracks[0] || forYouTracks[0] || null, [weeklyTrending, liveTracks, forYouTracks]);
+  const username = profile?.username ? `@${profile.username.toLowerCase()}` : `@${(profile?.display_name || profile?.artist_name || "auralisuser").toLowerCase().replace(/[^a-z0-9_]+/g, "_")}`;
+  const mobileTrending = weeklyTrending.length > 0 ? weeklyTrending : liveTracks.slice(0, 10);
+
   return (
-    <div className="flex-1 overflow-y-auto pb-36 scrollbar-hide">
+    <div className="relative flex-1 overflow-y-auto pb-36 scrollbar-hide">
+      <div className="md:hidden relative overflow-hidden px-5 pt-0 pb-6 bg-[#030907]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_12%_8%,rgba(26,214,112,0.22),transparent_34%),radial-gradient(circle_at_88%_4%,rgba(0,180,146,0.18),transparent_30%)]" />
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white/55">{getGreeting()}</p>
+              <h1 className="mt-0.5 truncate text-lg leading-tight font-display font-semibold text-white">{username}</h1>
+            </div>
+            <button onClick={() => onSectionChange?.("notifications")} className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white backdrop-blur-xl" aria-label="Notifications">
+              <Bell className="h-5 w-5" />
+            </button>
+          </div>
+
+          <button onClick={() => setShowSearch(true)} className="mt-5 flex min-h-[60px] w-full items-center gap-3 rounded-full border border-white/10 bg-white/[0.07] px-5 text-left text-white/55 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+            <Search className="h-6 w-6 text-white" />
+            <span className="min-w-0 flex-1 truncate text-[15px]">Search songs, artists, albums...</span>
+          </button>
+
+          {featuredTrack && (
+            <button onClick={() => onPlayTrack?.(featuredTrack)} className="relative mt-6 h-[220px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/5 text-left shadow-[0_28px_80px_rgba(0,0,0,0.48)]">
+              {featuredTrack.cover_url ? (
+                <img src={featuredTrack.cover_url} alt={featuredTrack.title} className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-[#10221b] to-black" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+              <div className="relative z-10 flex h-full flex-col justify-between p-5">
+                <span className="w-fit rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-100">Featured</span>
+                <div>
+                  <h2 className="max-w-[82%] text-[30px] leading-[0.95] font-display font-bold tracking-normal text-white">{featuredTrack.title}</h2>
+                  <p className="mt-2 text-sm font-medium text-white/72">{featuredTrack.artist_name}</p>
+                  <span className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-[#08783e] shadow-lg">
+                    <Play className="h-4 w-4 fill-current" /> Play Now
+                  </span>
+                </div>
+              </div>
+            </button>
+          )}
+
+          <div className="-mx-5 mt-5 overflow-x-auto px-5 pb-1 scrollbar-hide">
+            <div className="flex gap-3">
+              <button onClick={() => mobileTrending[0] && onPlayTrack?.(mobileTrending[0])} className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-4 text-sm font-semibold text-white"><Flame className="h-4 w-4 text-emerald-300" />Trending</button>
+              <button onClick={() => onSectionChange?.("explore")} className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-4 text-sm font-semibold text-white"><TrendingUp className="h-4 w-4 text-emerald-300" />Charts</button>
+              <button onClick={() => liveTracks[0] && onPlayTrack?.(liveTracks[0])} className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-4 text-sm font-semibold text-white"><Sparkles className="h-4 w-4 text-emerald-300" />New Releases</button>
+              <button onClick={() => forYouTracks[0] && onPlayTrack?.(forYouTracks[0])} className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-4 text-sm font-semibold text-white"><Headphones className="h-4 w-4 text-emerald-300" />For You</button>
+              <button onClick={onUploadMusic} className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-4 text-sm font-semibold text-white"><UploadCloud className="h-4 w-4 text-emerald-300" />Upload</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Greeting */}
-      <div className="relative pt-5 pb-4 px-4 md:px-8">
+      <div className="hidden md:block relative pt-5 pb-4 px-4 md:px-8">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <h1 className="text-xl md:text-3xl font-display font-bold text-foreground">
-            {getGreeting()}{profile?.display_name ? `, ${profile.display_name.split(" ")[0]}` : ""}
+            {getGreeting()}{profile?.username ? `, @${profile.username.toLowerCase()}` : profile?.display_name ? `, ${profile.display_name.split(" ")[0]}` : ""}
           </h1>
         </motion.div>
       </div>
 
       {/* Stats Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 px-4 md:px-8 scrollbar-hide mb-2">
+      <div className="hidden md:flex gap-2 overflow-x-auto pb-2 px-4 md:px-8 scrollbar-hide mb-2">
         {[
           { icon: Music2, label: `${liveTracks.length} Tracks` },
           { icon: TrendingUp, label: `${totalPlays.toLocaleString()} Plays` },
@@ -516,6 +577,15 @@ const HomePage = ({ playlists, onCreatePlaylist, onSelectPlaylist, onUploadMusic
           <p className="text-muted-foreground text-sm">Upload your first track or explore music to get started.</p>
         </div>
       )}
+
+      <SearchModal
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        tracks={liveTracks}
+        onPlayTrack={onPlayTrack as any}
+        onNavigate={(section) => onSectionChange?.(section)}
+        onSelectArtist={onViewProfile}
+      />
     </div>
   );
 };

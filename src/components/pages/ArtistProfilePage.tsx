@@ -4,6 +4,8 @@ import { ArrowLeft, Music2, Users, Play, Heart, Share2, UserPlus, UserCheck, Mes
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { dispatchPushNotification } from "@/lib/dispatchPushNotification";
+import { countryFlag } from "@/data/countries";
 
 interface Track {
   id: string;
@@ -48,7 +50,29 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
+  const [monthlyListeners, setMonthlyListeners] = useState<number | null>(null);
+  const [returningListeners, setReturningListeners] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const [monthly, returning] = await Promise.all([
+        supabase.rpc("get_artist_monthly_listeners", { artist_user_id: artistUserId }),
+        supabase.rpc("get_artist_returning_listeners", { artist_user_id: artistUserId }),
+      ]);
+      if (!active) return;
+      if (!monthly.error) setMonthlyListeners(Number(monthly.data) || 0);
+      if (!returning.error) setReturningListeners(Number(returning.data) || 0);
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 60000);
+    const channel = supabase.channel(`artist-listeners-${artistUserId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "artist_listener_stats", filter: `artist_user_id=eq.${artistUserId}` }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "artist_listener_stats", filter: `artist_user_id=eq.${artistUserId}` }, refresh)
+      .subscribe();
+    return () => { active = false; clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [artistUserId]);
 
   useEffect(() => {
     fetchArtistData();
@@ -104,6 +128,19 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
       
       setTracks(tracksData || []);
 
+      const { data: listenerCount, error: listenerError } = await supabase.rpc("get_artist_monthly_listeners", {
+        artist_user_id: artistUserId,
+      });
+      const { data: returningCount, error: returningError } = await supabase.rpc("get_artist_returning_listeners", {
+        artist_user_id: artistUserId,
+      });
+      if (listenerError) {
+        console.error("Could not fetch monthly listeners:", listenerError);
+      } else {
+        setMonthlyListeners(Number(listenerCount) || 0);
+      }
+      if (!returningError) setReturningListeners(Number(returningCount) || 0);
+
       // Check if following
       if (user) {
         const { data: followData } = await supabase
@@ -140,9 +177,11 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
         setFollowersCount(prev => prev - 1);
         toast.success("Unfollowed artist");
       } else {
-        await supabase
+        const { error } = await supabase
           .from("follows")
           .insert({ follower_id: user.id, following_id: artistUserId });
+        if (error) throw error;
+        void dispatchPushNotification("follower", user.id, user.id);
         
         setIsFollowing(true);
         setFollowersCount(prev => prev + 1);
@@ -238,7 +277,7 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
             )}
 
             {/* Stats */}
-            <div className="flex items-center justify-center md:justify-start gap-6 mb-4">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-3 mb-4">
               <div className="text-center">
                 <p className="text-xl font-bold text-foreground">{followersCount}</p>
                 <p className="text-xs text-muted-foreground">Followers</p>
@@ -251,6 +290,11 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
                 <p className="text-xl font-bold text-foreground">{profile.total_plays || 0}</p>
                 <p className="text-xs text-muted-foreground">Plays</p>
               </div>
+              <div className="text-center">
+                <p className="text-xl font-bold text-foreground">{monthlyListeners === null ? "—" : monthlyListeners.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Monthly listeners</p>
+                <p className="text-[10px] text-muted-foreground">{returningListeners.toLocaleString()} returned after 24 hours</p>
+              </div>
             </div>
 
             {/* Social Links */}
@@ -258,7 +302,7 @@ const ArtistProfilePage = ({ artistUserId, onBack, onPlayTrack, onMessage, onAdd
               {profile.country && (
                 <span className="flex items-center gap-1 text-sm text-muted-foreground">
                   <MapPin className="w-4 h-4" />
-                  {profile.country}
+                  {countryFlag(profile.country)} {profile.country}
                 </span>
               )}
               {profile.website && (

@@ -16,9 +16,10 @@ interface TopBarProps {
   tracks?: any[];
   onPlayTrack?: (track: any) => void;
   onSelectArtist?: (artistUserId: string) => void;
+  hiddenOnMobile?: boolean;
 }
 
-const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack, onSelectArtist }: TopBarProps) => {
+const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayTrack, onSelectArtist, hiddenOnMobile = false }: TopBarProps) => {
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const isMobile = useIsMobile();
@@ -61,7 +62,7 @@ const TopBar = ({ onSearch, onSectionChange, onUploadMusic, tracks = [], onPlayT
 
   return (
     <>
-      <header className="h-14 md:h-20 flex items-center justify-between px-3 md:px-8 sticky top-0 z-10 glass-strong border-b border-border/30">
+      <header className={`${hiddenOnMobile ? "hidden md:flex" : "flex"} h-14 md:h-20 items-center justify-between px-3 md:px-8 sticky top-0 z-10 glass-strong border-b border-border/30`}>
         {/* Left - Logo (mobile) & Navigation & Search */}
         <div className="flex items-center gap-2 md:gap-4 flex-1">
           {/* Mobile Logo */}

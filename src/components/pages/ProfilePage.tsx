@@ -1,10 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Music2, Heart, Play, TrendingUp, Users, Edit, Camera, Trash2, Save, X, Loader2, Plus, ImageIcon } from "lucide-react";
+import { User, Music2, Heart, Play, TrendingUp, Users, Edit, Camera, Trash2, Save, X, Loader2, Plus, ImageIcon, Download, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/hooks/useDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import Cropper, { type Area } from "react-easy-crop";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import SearchablePicker, { type PickerOption } from "@/components/SearchablePicker";
+import { countries, countryFlag } from "@/data/countries";
+import auralisWordmark from "@/assets/auralis-wordmark-source.webp";
+import { Capacitor } from "@capacitor/core";
 
 interface Track {
   id: string;
@@ -36,6 +42,35 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [monthlyListeners, setMonthlyListeners] = useState<number | null>(null);
+  const [returningListeners, setReturningListeners] = useState(0);
+  const [coverSource, setCoverSource] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [cropPixels, setCropPixels] = useState<Area | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const refresh = async () => {
+      const [monthly, returning] = await Promise.all([
+        supabase.rpc("get_artist_monthly_listeners", { artist_user_id: user.id }),
+        supabase.rpc("get_artist_returning_listeners", { artist_user_id: user.id }),
+      ]);
+      if (!active) return;
+      if (!monthly.error) setMonthlyListeners(Number(monthly.data) || 0);
+      if (!returning.error) setReturningListeners(Number(returning.data) || 0);
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 60000);
+    const channel = supabase.channel(`profile-listeners-${user.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "artist_listener_stats", filter: `artist_user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "artist_listener_stats", filter: `artist_user_id=eq.${user.id}` }, refresh)
+      .subscribe();
+    return () => { active = false; clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [user?.id]);
+
+  useEffect(() => () => { if (coverSource) URL.revokeObjectURL(coverSource); }, [coverSource]);
 
   const [editData, setEditData] = useState({
     display_name: profile?.display_name || "",
@@ -44,6 +79,7 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
     tiktok: profile?.tiktok || "",
     youtube: profile?.youtube || "",
     website: profile?.website || "",
+    country: profile?.country || "",
   });
 
   useEffect(() => {
@@ -55,6 +91,7 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
         tiktok: profile.tiktok || "",
         youtube: profile.youtube || "",
         website: profile.website || "",
+        country: profile.country || "",
       });
     }
   }, [profile]);
@@ -113,21 +150,39 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file || !user) return;
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCoverSource(URL.createObjectURL(file));
+  };
 
+  const saveCover = async () => {
+    if (!coverSource || !cropPixels || !user) return;
     setIsUploadingCover(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${user.id}/cover_${Date.now()}.${ext}`;
+      const image = new window.Image();
+      image.src = coverSource;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(cropPixels.width);
+      canvas.height = Math.round(cropPixels.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Could not crop image");
+      context.drawImage(image, cropPixels.x, cropPixels.y, cropPixels.width, cropPixels.height, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      if (!blob) throw new Error("Could not create cover image");
+      const path = `${user.id}/cover_${Date.now()}.jpg`;
       
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(path, file);
+        .upload(path, blob, { contentType: "image/jpeg" });
       
       if (uploadError) throw uploadError;
       
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       await updateProfile({ cover_photo_url: data.publicUrl });
+      setCoverSource(null);
       toast.success("Cover photo updated!");
     } catch (error) {
       toast.error("Failed to upload cover photo");
@@ -149,27 +204,96 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
     refetchTracks();
   };
 
-  const handleDeleteProfile = async () => {
-    const confirmed = window.confirm("Are you sure you want to delete your profile? This action cannot be undone.");
-    if (!confirmed) return;
+  const countryOptions: PickerOption[] = countries.map(({ code, name, flag }) => ({ value: name, label: name, prefix: flag }));
 
+  const downloadListenerCard = async () => {
     try {
-      await signOut();
-      toast.success("Account deleted");
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 630;
+    const context = canvas.getContext("2d");
+    if (!context) return toast.error("Could not create the listener image");
+    context.fillStyle = "#03130f";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    const gradient = context.createLinearGradient(0, 0, 1200, 630);
+    gradient.addColorStop(0, "rgba(0,217,138,.22)");
+    gradient.addColorStop(1, "rgba(0,184,156,.06)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = "rgba(0,217,138,.45)";
+    context.lineWidth = 2;
+    context.strokeRect(32, 32, 1136, 566);
+    context.fillStyle = "#e9fff7";
+    context.font = "700 28px Arial";
+    context.fillText("MONTHLY LISTENERS", 76, 340);
+    context.fillStyle = "#00d98a";
+    context.font = "700 108px Arial";
+    context.fillText((monthlyListeners ?? 0).toLocaleString(), 72, 270);
+    context.fillStyle = "#9bb7ad";
+    context.font = "400 28px Arial";
+    context.fillText(profile?.artist_name || profile?.display_name || "Auralis Artist", 78, 400);
+    context.font = "400 24px Arial";
+    context.fillText(`${returningListeners.toLocaleString()} returned after 24 hours`, 78, 442);
+    const logo = new window.Image();
+    logo.src = auralisWordmark;
+    try {
+      await logo.decode();
+      const maxWidth = 250;
+      const scale = Math.min(maxWidth / logo.naturalWidth, 74 / logo.naturalHeight);
+      const width = logo.naturalWidth * scale;
+      const height = logo.naturalHeight * scale;
+      context.drawImage(logo, 76, 470, width, height);
+    } catch {
+      context.fillStyle = "#00d98a";
+      context.font = "700 32px Arial";
+      context.fillText("Auralis", 76, 530);
+    }
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("Could not render your listener image");
+    const fileName = `auralis-monthly-listeners-${new Date().toISOString().slice(0, 10)}.png`;
+
+    if (Capacitor.isNativePlatform()) {
+      const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+        import("@capacitor/filesystem"),
+        import("@capacitor/share"),
+      ]);
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not prepare the listener image"));
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.readAsDataURL(blob);
+      });
+      const { uri } = await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
+      await Share.share({ title: "Auralis monthly listeners", text: "My Auralis artist audience", files: [uri], dialogTitle: "Save or share your listener image" });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = fileName;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+    toast.success("Listener image is ready to save or share");
     } catch (error) {
-      toast.error("Failed to delete account");
+      console.error("Could not export monthly listeners:", error);
+      toast.error(error instanceof Error ? error.message : "Could not download the listener image");
     }
   };
 
-  const stats = [
-    { label: "Followers", value: followersCount.toString(), icon: Users },
-    { label: "Following", value: followingCount.toString(), icon: Users },
-    { label: "Playlists", value: playlistCount.toString(), icon: Music2 },
-    { label: "Liked Songs", value: likedCount.toString(), icon: Heart },
-  ];
-
   return (
     <div className="flex-1 overflow-y-auto pb-32">
+      <Dialog open={Boolean(coverSource)} onOpenChange={(open) => { if (!open && !isUploadingCover) setCoverSource(null); }}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-lg border-border bg-background text-foreground">
+          <DialogTitle>Adjust cover photo</DialogTitle>
+          <div className="relative h-56 w-full overflow-hidden bg-black">
+            {coverSource && <Cropper image={coverSource} crop={crop} zoom={zoom} aspect={3} onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={(_, pixels) => setCropPixels(pixels)} />}
+          </div>
+          <label className="text-sm text-muted-foreground">Zoom<input aria-label="Cover zoom" className="mt-2 w-full accent-primary" type="range" min={1} max={3} step={0.01} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>
+          <button type="button" disabled={isUploadingCover || !cropPixels} onClick={saveCover} className="rounded-lg gradient-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{isUploadingCover ? "Saving..." : "Save cover"}</button>
+        </DialogContent>
+      </Dialog>
       {/* Cover Photo Header */}
       <div className="relative">
         <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
@@ -268,12 +392,20 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
                 {profile?.bio || "Music lover • Producer • Artist"}
               </p>
             )}
+            {isEditing ? (
+              <div className="mb-4 max-w-sm">
+                <label className="mb-2 flex items-center gap-2 text-left text-sm text-muted-foreground"><MapPin className="h-4 w-4 text-primary" />Country</label>
+                <SearchablePicker value={editData.country} options={countryOptions} onChange={(country) => setEditData({ ...editData, country })} title="Select your country" placeholder="Search all countries..." emptyLabel="Choose country" />
+              </div>
+            ) : profile?.country ? (
+              <p className="mb-4 text-sm text-muted-foreground">{countryFlag(profile.country)} {profile.country}</p>
+            ) : null}
             <div className="flex items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground">
-              <span>{playlistCount} Playlists</span>
+              <span>{followingCount} Following</span>
               <span>•</span>
               <span>{followersCount} Followers</span>
               <span>•</span>
-              <span>{followingCount} Following</span>
+              <span>{likedCount} Likes</span>
             </div>
           </motion.div>
 
@@ -319,21 +451,22 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
       {/* Stats */}
       <section className="px-4 md:px-8 py-6">
         <motion.div
-          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+          className="flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/[0.045] px-4 py-3 md:px-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="glass rounded-xl p-4 md:p-6 border border-border/30 text-center cursor-pointer hover:border-primary/30 transition-colors"
-            >
-              <stat.icon className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl md:text-3xl font-display font-bold text-foreground">{stat.value}</p>
-              <p className="text-xs md:text-sm text-muted-foreground">{stat.label}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <Music2 className="h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <p className="truncate text-lg font-display font-bold text-foreground">{monthlyListeners === null ? "—" : monthlyListeners.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Monthly listeners</p>
+              <p className="text-[10px] text-muted-foreground">{returningListeners.toLocaleString()} returned after 24 hours</p>
             </div>
-          ))}
+          </div>
+          <button type="button" onClick={() => void downloadListenerCard()} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-primary/25 px-3 text-sm font-medium text-primary hover:bg-primary/10" aria-label="Download monthly listeners image">
+            <Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span>
+          </button>
         </motion.div>
       </section>
 

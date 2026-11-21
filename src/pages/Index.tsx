@@ -232,7 +232,7 @@ const Index = () => {
     createdAt: new Date(p.created_at),
   }));
 
-  if (authLoading || dbLoading) {
+  if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -292,9 +292,9 @@ const Index = () => {
 
     switch (activeSection) {
       case "home":
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} onSectionChange={handleSectionChange} />;
       case "explore":
-        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} userPreferredGenre={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
+        return <ExplorePage tracks={tracks} onPlayTrack={handlePlayTrack} onAddToPlaylist={handleAddToPlaylist} onArtistClick={handleArtistClickFromTrack} onSelectArtist={handleViewArtist} onSectionChange={handleSectionChange} userCountry={profile?.country} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
       case "genre":
         return <GenrePage />;
       case "artists":
@@ -310,7 +310,7 @@ const Index = () => {
       case "upgrade":
         return <UpgradePage />;
       default:
-        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} />;
+        return <HomePage playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onSelectPlaylist={handleSelectPlaylist} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} onAddToPlaylist={handleAddToPlaylist} onUpgrade={handleUpgrade} onArtistClick={handleArtistClickFromTrack} onPlayAll={() => handlePlayAllTracks(0, false)} onShuffleAll={() => handlePlayAllTracks(0, true)} onSectionChange={handleSectionChange} />;
     }
   };
 
@@ -323,7 +323,7 @@ const Index = () => {
           <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} playlists={sidebarPlaylists} onCreatePlaylist={() => setShowCreatePlaylist(true)} onDeletePlaylist={handleDeletePlaylist} likedCount={likedTrackIds.length} onUploadMusic={() => setShowUploadMusic(true)} />
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onSelectArtist={handleViewArtist} />
+          <TopBar hiddenOnMobile={activeSection === "explore" || activeSection === "home"} onSectionChange={handleSectionChange} onUploadMusic={() => setShowUploadMusic(true)} tracks={tracks} onPlayTrack={handlePlayTrack} onSelectArtist={handleViewArtist} />
           <div className="flex-1 overflow-y-auto pb-40 md:pb-28">{renderContent()}</div>
         </div>
       </div>

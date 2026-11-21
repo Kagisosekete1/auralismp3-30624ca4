@@ -26,9 +26,10 @@ interface SearchModalProps {
   onPlayTrack: (track: Track) => void;
   onNavigate?: (section: string) => void;
   onSelectArtist?: (artistUserId: string) => void;
+  initialQuery?: string;
 }
 
-const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist }: SearchModalProps) => {
+const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelectArtist, initialQuery = "" }: SearchModalProps) => {
   const [query, setQuery] = useState("");
   const [musicFirst, setMusicFirst] = useState(
     () => localStorage.getItem("auralis-search-music-first") !== "false"
@@ -49,11 +50,11 @@ const SearchModal = ({ isOpen, onClose, tracks, onPlayTrack, onNavigate, onSelec
 
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
+      setQuery(initialQuery);
       setRemoteTracks([]);
       setRemoteArtists([]);
     }
-  }, [isOpen]);
+  }, [isOpen, initialQuery]);
 
   // Live search across every uploaded track + artist in the catalog
   useEffect(() => {

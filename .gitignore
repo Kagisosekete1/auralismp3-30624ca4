@@ -11,6 +11,20 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+android/local.properties
+**/.gradle/
+**/build/
+*.jks
+*.keystore
+*.p12
+*.pfx
+signing.properties
+google-services.json
+*firebase-admin*.json
+*service-account*.json
 
 # Editor directories and files
 .vscode/*
