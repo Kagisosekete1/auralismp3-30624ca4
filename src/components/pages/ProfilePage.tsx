@@ -209,44 +209,45 @@ const ProfilePage = ({ likedCount, playlistCount, tracks = [], onPlayTrack, onAd
   const downloadListenerCard = async () => {
     try {
     const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 630;
+    canvas.width = 1000;
+    canvas.height = 1000;
     const context = canvas.getContext("2d");
     if (!context) return toast.error("Could not create the listener image");
     context.fillStyle = "#03130f";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    const gradient = context.createLinearGradient(0, 0, 1200, 630);
+    context.fillRect(0, 0, 1000, 1000);
+    const gradient = context.createLinearGradient(0, 0, 1000, 1000);
     gradient.addColorStop(0, "rgba(0,217,138,.22)");
     gradient.addColorStop(1, "rgba(0,184,156,.06)");
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.strokeStyle = "rgba(0,217,138,.45)";
     context.lineWidth = 2;
-    context.strokeRect(32, 32, 1136, 566);
+    context.strokeRect(32, 32, 936, 936);
     context.fillStyle = "#e9fff7";
-    context.font = "700 28px Arial";
-    context.fillText("MONTHLY LISTENERS", 76, 340);
+    context.textAlign = "center";
+    context.font = "700 30px Arial";
+    context.fillText("MONTHLY LISTENERS", 500, 300);
     context.fillStyle = "#00d98a";
-    context.font = "700 108px Arial";
-    context.fillText((monthlyListeners ?? 0).toLocaleString(), 72, 270);
+    context.font = "700 128px Arial";
+    context.fillText((monthlyListeners ?? 0).toLocaleString(), 500, 445);
     context.fillStyle = "#9bb7ad";
     context.font = "400 28px Arial";
-    context.fillText(profile?.artist_name || profile?.display_name || "Auralis Artist", 78, 400);
+    context.fillText(profile?.artist_name || profile?.display_name || "Auralis Artist", 500, 510, 840);
     context.font = "400 24px Arial";
-    context.fillText(`${returningListeners.toLocaleString()} returned after 24 hours`, 78, 442);
+    context.fillText(`${returningListeners.toLocaleString()} returned after 24 hours`, 500, 555);
     const logo = new window.Image();
     logo.src = auralisWordmark;
     try {
       await logo.decode();
-      const maxWidth = 250;
-      const scale = Math.min(maxWidth / logo.naturalWidth, 74 / logo.naturalHeight);
+      const maxWidth = 300;
+      const scale = Math.min(maxWidth / logo.naturalWidth, 90 / logo.naturalHeight);
       const width = logo.naturalWidth * scale;
       const height = logo.naturalHeight * scale;
-      context.drawImage(logo, 76, 470, width, height);
+      context.drawImage(logo, (1000 - width) / 2, 670, width, height);
     } catch {
       context.fillStyle = "#00d98a";
       context.font = "700 32px Arial";
-      context.fillText("Auralis", 76, 530);
+      context.fillText("Auralis", 500, 720);
     }
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("Could not render your listener image");
