@@ -92,6 +92,7 @@ export interface DbProfile {
   followers_count: number;
   total_plays: number;
   is_artist: boolean;
+  creator_role?: "listener" | "artist" | "dj" | "producer";
   subscription_tier?: string;
   short_reel_url?: string;
 }
@@ -547,5 +548,6 @@ export const useDatabase = () => {
     updateProfile,
     refetchTracks: fetchTracks,
     refetchPlaylists: fetchPlaylists,
+    refetchProfile: fetchProfile,
   };
 };

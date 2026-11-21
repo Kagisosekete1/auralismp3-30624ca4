@@ -33,11 +33,12 @@ import { useQueue, type QueueTrack } from "@/hooks/useQueue";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import UploadQueuePanel from "@/components/UploadQueuePanel";
 import PostNotificationModal from "@/components/PostNotificationModal";
+import ArtistSetupDialog from "@/components/ArtistSetupDialog";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks } = useDatabase();
+  const { tracks, playlists, likedTrackIds, profile, loading: dbLoading, createPlaylist, deletePlaylist, toggleLike, refetchTracks, refetchProfile } = useDatabase();
   const { queue, history, shuffleEnabled, repeatMode, addToQueue, removeFromQueue, clearQueue, toggleShuffle, cycleRepeat, playNext, playPrevious, setQueueAndPlay } = useQueue();
   
   const playNextRef = useRef(playNext);
@@ -81,6 +82,7 @@ const Index = () => {
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [showUploadMusic, setShowUploadMusic] = useState(false);
+  const [showArtistSetup, setShowArtistSetup] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
   const [notificationPostId, setNotificationPostId] = useState<string | null>(null);
@@ -164,8 +166,7 @@ const Index = () => {
 
   const handleUploadRequest = () => {
     if (!profile?.is_artist) {
-      toast.error("Music uploads are for artist accounts. Listeners can keep listening or explore Premium.");
-      handleUpgrade();
+      setShowArtistSetup(true);
       return;
     }
     setShowUploadMusic(true);
@@ -401,6 +402,7 @@ const Index = () => {
         trackTitle={selectedTrackForPlaylist?.title || ""} 
       />
       <FullUploadForm isOpen={showUploadMusic} onClose={() => setShowUploadMusic(false)} onSuccess={refetchTracks} onUpgrade={handleUpgrade} />
+      <ArtistSetupDialog open={showArtistSetup} onOpenChange={setShowArtistSetup} initialName={profile?.artist_name || profile?.display_name || ""} onComplete={async () => { await refetchProfile(); setShowUploadMusic(true); }} />
       <PostNotificationModal postId={notificationPostId} onClose={() => setNotificationPostId(null)} onPlayTrack={handlePlayTrack} onViewProfile={handleViewArtist} />
       <InboxModal isOpen={showInbox} onClose={() => setShowInbox(false)} />
       <InstallBanner />

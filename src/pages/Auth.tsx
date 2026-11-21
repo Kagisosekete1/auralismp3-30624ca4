@@ -18,6 +18,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
+  const [accountRole, setAccountRole] = useState<"listener" | "artist" | "dj" | "producer">("listener");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +68,7 @@ const Auth = () => {
     
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, displayName.trim(), username);
+        const { error } = await signUp(email, password, displayName.trim(), username, accountRole);
         if (error) {
           if (error.message.includes("already registered")) {
             toast.error("This email is already registered. Please sign in instead.");
@@ -149,6 +150,16 @@ const Auth = () => {
                     placeholder="Your artist name"
                     className="w-full pl-12 pr-4 py-3 rounded-xl bg-surface-elevated/50 border border-border/50 focus:border-primary/50 text-foreground placeholder:text-muted-foreground outline-none transition-all"
                   />
+                </div>
+                <div className="mt-4">
+                  <label htmlFor="account-role" className="mb-2 block text-sm font-medium text-foreground">How will you use Auralis?</label>
+                  <select id="account-role" value={accountRole} onChange={(event) => setAccountRole(event.target.value as typeof accountRole)} className="w-full rounded-xl border border-border/50 bg-surface-elevated/50 px-4 py-3 text-foreground outline-none focus:border-primary/50">
+                    <option value="listener">Listener</option>
+                    <option value="artist">Artist</option>
+                    <option value="dj">DJ</option>
+                    <option value="producer">Producer</option>
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">Listeners stream music. Creator accounts can publish eligible releases.</p>
                 </div>
               </motion.div>
             )}
