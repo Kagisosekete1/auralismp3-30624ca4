@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { DocumentContent, TermsContent } from "@/components/TermsContent";
 import privacy from "@/data/privacy.md?raw";
+import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 import helpCentre from "@/data/help-centre.md?raw";
 import about from "@/data/about.md?raw";
 
@@ -29,8 +31,18 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
     toast.success("Logged out successfully");
   };
 
-  const handleDeleteAccount = () => {
-    window.location.href = "mailto:semogrouptech@gmail.com?subject=Auralis%20account%20deletion%20request&body=Please%20help%20me%20delete%20my%20Auralis%20account.%20My%20account%20email%20is%3A%20";
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE" } });
+      if (error || !data?.deleted) throw Error();
+      await supabase.auth.signOut({ scope: "local" });
+      toast.success("Your Auralis account has been deleted.");
+    } catch {
+      toast.error("Deletion not confirmed. Retry or contact semogrouptech@gmail.com.");
+    } finally { setDeleting(false); }
   };
 
   const toggleTheme = () => {
@@ -241,7 +253,7 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
           </h2>
           <div className="glass rounded-2xl border border-destructive/30 overflow-hidden">
             <motion.button
-              onClick={handleDeleteAccount}
+              onClick={() => setShowDeleteConfirm(true)}
               className="w-full flex items-center gap-4 p-4 md:p-5 hover:bg-destructive/10 transition-colors text-left text-destructive"
               whileHover={{ x: 4 }}
             >
@@ -249,12 +261,18 @@ const SettingsPage = ({ onSectionChange }: SettingsPageProps) => {
                 <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm md:text-base">Request Account Deletion</h3>
-                <p className="text-xs md:text-sm text-destructive/70">Open an email to request deletion from support</p>
+                <h3 className="font-medium text-sm md:text-base">Delete my account</h3>
+                <p className="text-xs md:text-sm text-destructive/70">Permanently remove your account and uploads</p>
               </div>
               <ChevronRight className="w-5 h-5" />
             </motion.button>
+            {showDeleteConfirm && <div className="space-y-3 p-4">
+              <p>This permanently deletes your account and uploaded music. This cannot be undone.</p>
+              <button disabled={deleting} className="mr-6 p-2" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button disabled={deleting} className="p-2 text-destructive" onClick={handleDeleteAccount}>{deleting ? "Deleting..." : "Permanently delete"}</button>
+            </div>}
           </div>
+          <nav className="flex gap-4 py-4 text-primary"><Link to="/delete-account">Deletion help</Link><Link to="/privacy-policy">Privacy policy</Link></nav>
         </motion.section>
       </div>
     </div>
